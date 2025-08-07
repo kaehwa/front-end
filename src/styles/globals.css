@@ -1,0 +1,27 @@
+/* src/styles/globals.css */
+
+/* Tailwind 기본 레이어 불러오기 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 전역 CSS 변수 */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+/* 다크 모드 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* 본문 스타일 */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "JunggoDotum", sans-serif;
+}

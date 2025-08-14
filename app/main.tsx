@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Animated, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, Pressable } from "react-native";
+import { router } from "expo-router";
 
 export default function ListeningMission() {
   const initialQuestions = [
@@ -31,6 +32,7 @@ export default function ListeningMission() {
   const [inGiver, setInGiver] = useState("");
   const [inReciver, setInReciver] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const [showNext, setShowNext] = useState(false);
 
   const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
 
@@ -83,6 +85,7 @@ export default function ListeningMission() {
       finalAnswers[currentIndex] = answer.trim();
       // console.log("최종 업로드 배열:", finalAnswers);
       postText(finalAnswers);
+      setShowNext(true)
       alert("모든 질문이 완료되었습니다!");
       return;
     }
@@ -140,7 +143,7 @@ export default function ListeningMission() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(postFormat),
       });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      //if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
       const responseData = await response.json();
       console.log(`POST 성공 : ${responseData}`);
@@ -194,6 +197,11 @@ export default function ListeningMission() {
       <TouchableOpacity style={styles.button} onPress={handleNext}>
         <Text style={styles.buttonText}>다음</Text>
       </TouchableOpacity>
+      {showNext && (
+        <Pressable style={styles.button} onPress={() => router.push("/recommendations")}>
+          <Text style={styles.buttonText}> 추천 페이지로 </Text>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }

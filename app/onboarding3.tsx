@@ -50,7 +50,7 @@ export default function Onboarding3() {
         ))}
       </ScrollView>
 
-      <Pressable style={styles.nextButton} onPress={() => router.push("/recommendations")}>
+      <Pressable style={styles.nextButton} onPress={() => router.push("/main")}>
         <Text style={styles.nextButtonText}>시작하기</Text>
       </Pressable>
     </View>

@@ -51,7 +51,7 @@ export default function Onboarding3() {
       </ScrollView>
 
       <Pressable style={styles.nextButton} onPress={() => router.push("/main")}>
-        <Text style={styles.nextButtonText}>시작하기</Text>
+        <Text style={styles.nextButtonText}>다음</Text>
       </Pressable>
     </View>
   );
@@ -60,7 +60,7 @@ export default function Onboarding3() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF2CC",
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 100,
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 60,
     alignSelf: "center",
-    backgroundColor: "#7A958E",
+    backgroundColor: "#FB7431",
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 30,

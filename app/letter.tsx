@@ -190,7 +190,7 @@ export default function LetterPage() {
     <View style={styles.container}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>당신만의 편지</Text>
+        <Text style={styles.headerTitle}>너에게 전하는 마음</Text>
         <Text style={styles.headerSub}>
           AI가 초안을 만들었어요. 필요하면 직접 다듬어 보세요.
         </Text>
@@ -238,11 +238,11 @@ export default function LetterPage() {
             {!editing ? (
               <>
                 <Pressable style={[styles.btn, styles.btnGhost]} onPress={onCopy} accessibilityLabel="복사하기">
-                  <Ionicons name="copy-outline" size={18} color="#7A958E" />
+                  <Ionicons name="copy-outline" size={18} color="#FB7431" />
                   <Text style={styles.btnGhostText}>복사</Text>
                 </Pressable>
                 <Pressable style={[styles.btn, styles.btnGhost]} onPress={onShare} accessibilityLabel="공유하기">
-                  <Ionicons name="share-social-outline" size={18} color="#7A958E" />
+                  <Ionicons name="share-social-outline" size={18} color="#FB7431" />
                   <Text style={styles.btnGhostText}>공유</Text>
                 </Pressable>
                 <Pressable style={[styles.btn, styles.btnPrimary]} onPress={onEdit} accessibilityLabel="수정하기">
@@ -258,7 +258,7 @@ export default function LetterPage() {
                   disabled={saving}
                   accessibilityLabel="취소"
                 >
-                  <Ionicons name="close" size={18} color="#7A958E" />
+                  <Ionicons name="close" size={18} color="#FB7431" />
                   <Text style={styles.btnGhostText}>취소</Text>
                 </Pressable>
                 <Pressable
@@ -295,7 +295,7 @@ export default function LetterPage() {
             onPress={() => router.replace("/recommendations")}
             accessibilityLabel="다른 추천 보러가기"
           >
-            <Ionicons name="albums-outline" size={18} color="#7A958E" />
+            <Ionicons name="albums-outline" size={18} color="#FB7431" />
             <Text style={styles.btnGhostText}>다른 추천 보기</Text>
           </Pressable>
         </View>
@@ -307,7 +307,7 @@ export default function LetterPage() {
 /* ----------------- Styles ----------------- */
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#FFF2CC" },
 
   header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 8 },
   headerTitle: { fontSize: 20, fontWeight: "800", color: "#222" },
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
   },
-  tipText: { color: "#415a55", fontSize: 12 },
+  tipText: { color: "#FB7431", fontSize: 12 },
 
   skeletonCard: {
     width: "88%",
@@ -408,10 +408,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  btnPrimary: { backgroundColor: "#7A958E" },
+  btnPrimary: { backgroundColor: "#FB7431" },
   btnPrimaryText: { color: "#fff", fontWeight: "800" },
-  btnGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#7A958E" },
-  btnGhostText: { color: "#7A958E", fontWeight: "800" },
+  btnGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#FB7431" },
+  btnGhostText: { color: "#FB7431", fontWeight: "800" },
 
   footerCtas: {
     gap: 10,

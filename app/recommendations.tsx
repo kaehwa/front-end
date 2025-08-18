@@ -27,7 +27,7 @@ const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // 실제 서버 주소
 type Bouquet = {
   id: string;
   title: string;
-  imageUrl: string[];
+  imageUrl: string;
   price?: number;
   tags?: string[];
   palette?: string[];
@@ -135,7 +135,7 @@ export default function Recommendations() {
   const onPressCard = (item: Bouquet) => {
     router.push({
       pathname: "/confirm",
-      params: { id: item.id, title: item.title },
+      params: { id: item.id, title: item.title, imageUrl: item.imageUrl, },
     });
   };
 

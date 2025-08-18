@@ -32,11 +32,11 @@ export default function ListeningMission() {
   const [isTyping, setIsTyping] = useState(false);
   const [inGiver, setInGiver] = useState("");
   const [inReciver, setInReciver] = useState("");
-  const [showUpload, setShowUpload] = useState(false);
+  // const [showUpload, setShowUpload] = useState(false);
   const [showNext, setShowNext] = useState(false);
 
   const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
-  const ID = "1"
+  const ID = "2"
 
   const expressions = [
     
@@ -103,12 +103,14 @@ export default function ListeningMission() {
     } else if (currentIndex === 1) {
       setInReciver(answer);
       reQuestion = ` "${inGiver}"  님과 "${answer}" 님과의 관계는 어떻게 되나요?`;
-    } else if (currentIndex === 3) {
-      reQuestion = `좋아요! ${inReciver} 님의 사진과 목소리를 업로드 해주시겠어요?`;
-      setShowUpload(true);
-    } else {
+    } 
+    // else if (currentIndex === 3) {
+    //   reQuestion = `좋아요! ${inReciver} 님의 사진과 목소리를 업로드 해주시겠어요?`;
+    //   setShowUpload(true);
+    // } 
+    else {
       reQuestion = initialQuestions[nextIndex]
-      setShowUpload(false)
+      // setShowUpload(false)
     }
     
     setPlaceHolder(initialPlaceHolder[currentIndex])
@@ -197,7 +199,7 @@ const handleAudioUpload = async () => {
 
       {/* 입력란 및 버튼 */}
       <View style={styles.inputWrapper}>
-        {showUpload ? (
+        {/* {showUpload ? (
           <View>
             <TouchableOpacity style={styles.uploadButton} onPress={handleImageUpload}>
               <Text style={styles.buttonText}>사진 업로드</Text>
@@ -206,7 +208,7 @@ const handleAudioUpload = async () => {
               <Text style={styles.buttonText}>음성 업로드</Text>
             </TouchableOpacity>
           </View>
-        ) : (
+        ) : ( */}
           <TextInput
             style={[styles.input, { color: isTyping ? "#333" : "#999" }]}
             placeholder={placeHolder}
@@ -218,7 +220,7 @@ const handleAudioUpload = async () => {
             }}
             multiline
           />
-        )}
+        {/* )} */}
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleNext}>

@@ -10,7 +10,9 @@ import {
   RefreshControl,
   ActivityIndicator,
   Animated,
+  ImageSourcePropType,
 } from "react-native";
+
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -25,13 +27,57 @@ const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // 실제 서버 주소
 type Bouquet = {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl: string[];
   price?: number;
   tags?: string[];
   palette?: string[];
   floristName?: string;
   score?: number;
 };
+
+//더미 데이터
+const dummyBouquets: Bouquet[] = [
+  {
+    id: "1",
+    title: "Spring Blossom",
+    imageUrl: require("./../assets/dummy/flower5.jpg"),
+    price: 45000,
+    tags: ["spring", "pink", "gift"],
+    palette: ["#FADADD", "#FFC0CB", "#FFFFFF"],
+    floristName: "Jun Pyo",
+    score: 4.8,
+  },
+  {
+    id: "2",
+    title: "Sunshine Delight",
+    imageUrl: require("./../assets/dummy/flower6.jpg"),
+    price: 52000,
+    tags: ["yellow", "birthday"],
+    palette: ["#FFFACD", "#FFD700", "#FFA500"],
+    floristName: "Woung",
+    score: 4.5,
+  },
+  {
+    id: "3",
+    title: "Romantic Rose",
+    imageUrl: require("./../assets/dummy/flower7.jpg"),
+    price: 60000,
+    tags: ["rose", "red", "anniversary"],
+    palette: ["#FF0000", "#C71585", "#8B0000"],
+    floristName: "Sun Ah",
+    score: 4.9,
+  },
+  {
+    id: "4",
+    title: "Romantic Rose",
+    imageUrl: require("./../assets/dummy/flower8.jpg"),
+    price: 60000,
+    tags: ["rose", "red", "anniversary"],
+    palette: ["#FF0000", "#C71585", "#8B0000"],
+    floristName: "Min Jae",
+    score: 4.9,
+  },
+];
 
 export default function Recommendations() {
   const params = useLocalSearchParams(); // { userId, mood, palette } 같은 쿼리 전달 가능
@@ -60,9 +106,10 @@ export default function Recommendations() {
       }).toString();
 
       console.log(BACKEND_URL)
-      const res = await fetch(`${BACKEND_URL}/api/recommendations?${query}`);
-      if (!res.ok) throw new Error("API 응답 오류");
-      const data: Bouquet[] = await res.json();
+      // const res = await fetch(`${BACKEND_URL}/api/recommendations?${query}`);
+      // if (!res.ok) throw new Error("API 응답 오류");
+      // const data: Bouquet[] = await res.json();
+      const data: Bouquet[] = dummyBouquets
 
       // 최소 4개만 보장
       setItems((data || []).slice(0, 4));
@@ -183,7 +230,7 @@ function Card({
   return (
     <Pressable style={styles.card} onPress={onPress} accessibilityLabel={`${item.title} 상세보기`}>
       <View style={styles.imageWrap}>
-        <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
+        <Image source={item.imageUrl} style={styles.image} resizeMode="cover" />
         <Animated.View style={[styles.likeBtn, { transform: [{ scale }] }]}>
           <Pressable onPress={onToggleLike} hitSlop={10} accessibilityLabel="찜하기">
             <Ionicons name={liked ? "heart" : "heart-outline"} size={20} color={liked ? "#e11d48" : "#ffffff"} />

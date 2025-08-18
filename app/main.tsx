@@ -34,18 +34,15 @@ export default function ListeningMission() {
   /** 상태 */
   const [currentIndex, setCurrentIndex] = useState(0);
   const [giver, setGiver] = useState(""); // 주는 사람
-  const [answers, setAnswers] = useState<string[]>(Array(4).fill("")); 
-  const [answer, setAnswer] = useState(""); 
+  const [answers, setAnswers] = useState<string[]>(Array(4).fill(""));
+  const [answer, setAnswer] = useState("");
   const [placeHolder, setPlaceHolder] = useState(PLACEHOLDERS[0]);
-  const [showUpload, setShowUpload] = useState(false); 
+  const [showUpload, setShowUpload] = useState(false);
   const [showDoneModal, setShowDoneModal] = useState(false);
-  const [uploadDone, setUploadDone] = useState(false);
 
-  // 미사용 but 남겨둔 변수
-  const [isTyping] = useState(false);
-  const [inGiver] = useState("");
-  const [inReciver] = useState("");
-  const [showNext] = useState(false);
+  // 업로드 상태
+  const [imageDone, setImageDone] = useState(false);
+  const [audioDone, setAudioDone] = useState(false);
 
   /** 서버 설정 */
   const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
@@ -101,6 +98,29 @@ export default function ListeningMission() {
     giver || "OOO"
   );
 
+  /** 업로드 핸들러 */
+  const handleImageUpload = async () => {
+    try {
+      await uploadImage(BACK_SWAGGER_URL, ID);
+      alert("이미지 업로드 성공!");
+      setImageDone(true);
+    } catch (err) {
+      console.error(err);
+      alert("이미지 업로드 실패");
+    }
+  };
+
+  const handleAudioUpload = async () => {
+    try {
+      await uploadAudio(BACK_SWAGGER_URL, ID);
+      alert("오디오 업로드 성공!");
+      setAudioDone(true);
+    } catch (err) {
+      console.error(err);
+      alert("오디오 업로드 실패");
+    }
+  };
+
   /** 다음 버튼 핸들러 */
   const handleNext = async () => {
     if (!showUpload) {
@@ -109,6 +129,11 @@ export default function ListeningMission() {
       nextAns[currentIndex] = trimmed;
       setAnswers(nextAns);
       if (currentIndex === 0) setGiver(trimmed);
+    } else {
+      // 업로드 단계: 값 설정
+      const nextAns = [...answers];
+      nextAns[3] = "uploaded";
+      setAnswers(nextAns);
     }
 
     if (currentIndex === QUESTIONS.length - 1) {
@@ -122,43 +147,9 @@ export default function ListeningMission() {
     setPlaceHolder(PLACEHOLDERS[nextIndex] || "내용을 입력해주세요");
     setAnswer("");
     setShowUpload(nextIndex === 3);
+    setImageDone(false);
+    setAudioDone(false);
     changeExpression();
-  };
-
-  /** 업로드 */
-  const handleUpload = () => {
-    const nextAns = [...answers];
-    nextAns[3] = "uploaded"; 
-    setAnswers(nextAns);
-    setUploadDone(true);
-  };
-
-  const handleImageUpload = async () => {
-    try {
-      const result = await uploadImage(BACK_SWAGGER_URL, ID);
-      alert("이미지 업로드 성공!");
-      console.log(result);
-    } catch (err) {
-      console.error(err);
-      alert("이미지 업로드 실패");
-    }
-  };
-
-  const handleAudioUpload = async () => {
-    try {
-      const result = await uploadAudio(BACK_SWAGGER_URL, ID);
-      alert("오디오 업로드 성공!");
-      console.log(result);
-    } catch (err) {
-      console.error(err);
-      alert("오디오 업로드 실패");
-    }
-  };
-
-  /** 완료 팝업 */
-  const handleModalOK = () => {
-    setShowDoneModal(false);
-    router.push("/recommendations");
   };
 
   /** 서버 전송 */
@@ -183,6 +174,15 @@ export default function ListeningMission() {
       console.log("POST 실패:", e);
     }
   }
+
+  /** 완료 팝업 */
+  const handleModalOK = () => {
+    setShowDoneModal(false);
+    router.push("/recommendations");
+  };
+
+  /** 다음 버튼 활성화 여부 */
+  const canNext = !showUpload || (imageDone && audioDone);
 
   /** UI */
   return (
@@ -220,14 +220,25 @@ export default function ListeningMission() {
       {/* 입력/업로드 영역 */}
       <View style={styles.formArea}>
         {showUpload ? (
-          <TouchableOpacity
-            style={[styles.uploadBtn, uploadDone && { opacity: 0.8 }]}
-            onPress={handleUpload}
-          >
-            <Text style={styles.uploadText}>
-              {uploadDone ? "업로드 완료 ✓" : "사진과 음성을 올려주세요."}
-            </Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={[styles.uploadBtn, imageDone && { opacity: 0.8 }]}
+              onPress={handleImageUpload}
+            >
+              <Text style={styles.uploadText}>
+                {imageDone ? "사진 업로드 완료 ✓" : "사진 올리기"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.uploadBtn, audioDone && { opacity: 0.8, marginTop: 12 }]}
+              onPress={handleAudioUpload}
+            >
+              <Text style={styles.uploadText}>
+                {audioDone ? "음성 업로드 완료 ✓" : "음성 올리기"}
+              </Text>
+            </TouchableOpacity>
+          </>
         ) : (
           <TextInput
             style={styles.input}
@@ -240,19 +251,18 @@ export default function ListeningMission() {
         )}
       </View>
 
-      {/* 다음 버튼 */}
-      <TouchableOpacity
-        style={[
-          styles.cta,
-          showUpload && !uploadDone ? { opacity: 0.5 } : null,
-        ]}
-        onPress={handleNext}
-        disabled={showUpload && !uploadDone}
-      >
-        <Text style={styles.ctaText}>
-          {currentIndex === QUESTIONS.length - 1 ? "완료" : "다음"}
-        </Text>
-      </TouchableOpacity>
+      {/* 다음 / 건너뛰기 버튼 */}
+      <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+        <TouchableOpacity
+          style={[styles.cta, !canNext && { opacity: 0.5 }]}
+          onPress={handleNext}
+          disabled={!canNext}
+        >
+          <Text style={styles.ctaText}>
+            {currentIndex === QUESTIONS.length - 1 ? "완료" : "다음"}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* 완료 팝업 */}
       <Modal
@@ -277,22 +287,14 @@ export default function ListeningMission() {
   );
 }
 
-/** 스타일 */
+/** 스타일 (기존 그대로) */
 const BG = "#FFF4DA";
 const ORANGE = "#FF7A3E";
 const WHITE = "#FFFFFF";
 const BORDER = "rgba(0,0,0,0.06)";
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    gap: 16,
-  },
-  /** 말풍선 */
+  container: { flex: 1, backgroundColor: BG, alignItems: "center", paddingHorizontal: 20, paddingTop: 24, gap: 16 },
   speechWrap: { maxWidth: "90%", alignSelf: "center", alignItems: "center" },
   speechBubble: {
     backgroundColor: WHITE,
@@ -301,145 +303,24 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 1,
     borderColor: BORDER,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-      },
-      android: { elevation: 2 },
-    }),
+    ...Platform.select({ ios: { shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }, android: { elevation: 2 } }),
   },
-  questionText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#1F2937",
-    textAlign: "center",
-    letterSpacing: 0.1,
-    fontWeight: "600",
-  },
-  tailTriWrap: {
-    position: "absolute",
-    bottom: -10,
-    left: "50%",
-    marginLeft: -10,
-    width: 0,
-    height: 0,
-    pointerEvents: "none",
-  },
-  tailTriBorder: {
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 12,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: BORDER,
-  },
-  tailTriFill: {
-    position: "absolute",
-    top: -11,
-    borderLeftWidth: 9,
-    borderRightWidth: 9,
-    borderTopWidth: 11,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: WHITE,
-  },
-  /** 마스코트 */
+  questionText: { fontSize: 16, lineHeight: 24, color: "#1F2937", textAlign: "center", letterSpacing: 0.1, fontWeight: "600" },
+  tailTriWrap: { position: "absolute", bottom: -10, left: "50%", marginLeft: -10, width: 0, height: 0, pointerEvents: "none" },
+  tailTriBorder: { borderLeftWidth: 10, borderRightWidth: 10, borderTopWidth: 12, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: BORDER },
+  tailTriFill: { position: "absolute", top: -11, borderLeftWidth: 9, borderRightWidth: 9, borderTopWidth: 11, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: WHITE },
   mascotWrap: { width: 220, height: 250, alignItems: "center", justifyContent: "center" },
   mascot: { width: "100%", height: "100%" },
-  /** 입력/업로드 */
   formArea: { width: "80%", marginTop: 5 },
-  input: {
-    backgroundColor: WHITE,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-    minHeight: 44,
-    fontSize: 15,
-    color: "#111",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  uploadBtn: {
-    backgroundColor: WHITE,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
+  input: { backgroundColor: WHITE, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 12, minHeight: 44, fontSize: 15, color: "#111", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  uploadBtn: { backgroundColor: WHITE, borderRadius: 12, paddingVertical: 14, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   uploadText: { fontSize: 15, color: "#374151", fontWeight: "600" },
-  /** CTA */
-  cta: {
-    marginTop: 16,
-    backgroundColor: ORANGE,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
+  cta: { flex: 1, backgroundColor: ORANGE, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 26, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   ctaText: { color: WHITE, fontSize: 16, fontWeight: "700" },
-  /** 완료 팝업 */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: WHITE,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-      },
-      android: { elevation: 6 },
-    }),
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  modalMsg: {
-    fontSize: 14,
-    color: "#374151",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  modalBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    backgroundColor: "#FF7A3E",
-    minWidth: 88,
-    alignItems: "center",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center", padding: 24 },
+  modalCard: { width: "100%", maxWidth: 360, backgroundColor: WHITE, borderRadius: 16, paddingVertical: 20, paddingHorizontal: 16, alignItems: "center", ...Platform.select({ ios: { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } }, android: { elevation: 6 } }) },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: "#111827", marginBottom: 8, textAlign: "center" },
+  modalMsg: { fontSize: 14, color: "#374151", textAlign: "center", lineHeight: 20, marginBottom: 16 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 12, backgroundColor: "#FF7A3E", minWidth: 88, alignItems: "center" },
   modalBtnText: { color: WHITE, fontSize: 16, fontWeight: "700" },
 });

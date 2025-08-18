@@ -19,18 +19,17 @@ type BouquetItem = {
 };
 
 export default function ConfirmSelectedBouquet() {
+
   const params = useLocalSearchParams<{ id?: string; title?: string; imageUrl?: string }>();
-  const stableId = useMemo(
-    () => (typeof params.id === "string" ? params.id : params.id ? String(params.id) : ""),
-    [params.id]
-  );
+  console.log(params)
+  const stableId = useMemo(() => String(params.id ?? ""), [params.id]);
   const insets = useSafeAreaInsets();
 
   const [data, setData] = useState<BouquetItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // 애니메이션 값들
+  // 애니메이션 값
   const checkScale = useRef(new Animated.Value(0.2)).current;
   const checkOpacity = useRef(new Animated.Value(0)).current;
   const msgY = useRef(new Animated.Value(20)).current;
@@ -42,6 +41,7 @@ export default function ConfirmSelectedBouquet() {
   const runIntroAnimOnce = useCallback(() => {
     if (animatedRef.current) return;
     animatedRef.current = true;
+
     Animated.sequence([
       Animated.parallel([
         Animated.timing(checkOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
@@ -59,52 +59,45 @@ export default function ConfirmSelectedBouquet() {
   }, [checkOpacity, checkScale, msgOpacity, msgY, imgOpacity, imgY]);
 
   useEffect(() => {
-    console.log("debug param")
-    console.log(params)
-    console.log("debug imageUrl")
-    console.log(params.imageUrl)
-    if (params.imageUrl) {
-      setData({
-        id: stableId,
-        imageUrl: params.imageUrl,
-        title: params.title ?? "선택한 꽃다발",
-        floristName: "플로리스트 라온",
-        palette: ["#e7e0d8", "#c4a7a1", "#7A958E"],
-      });
-      requestAnimationFrame(runIntroAnimOnce);
-      setLoading(false);
-    } else {
+    if (!params.imageUrl) {
       setErr("잘못된 요청입니다. 다시 시도해 주세요.");
       setLoading(false);
+      return;
     }
+
+    setData({
+      id: stableId,
+      imageUrl: params.imageUrl,
+      title: params.title ?? "선택한 꽃다발",
+      floristName: "플로리스트 라온",
+      palette: ["#e7e0d8", "#c4a7a1", "#7A958E"],
+    });
+
+    requestAnimationFrame(runIntroAnimOnce);
+    setLoading(false);
   }, [params.imageUrl, params.title, stableId, runIntroAnimOnce]);
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 12, color: "#666" }}>꽃 한 송이의 순간을 불러오고 있어요…</Text>
+        <Text style={styles.loadingText}>꽃 한 송이의 순간을 불러오고 있어요…</Text>
         <View style={styles.skeleton} />
       </View>
     );
   }
 
-  if (err) {
+  if (err || !data) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: "#b91c1c", marginBottom: 16, textAlign: "center" }}>{err}</Text>
-        <Pressable
-          style={styles.retryBtn}
-          onPress={() => router.replace("/recommendations")}
-        >
+        <Text style={styles.errorText}>{err ?? "알 수 없는 오류가 발생했습니다."}</Text>
+        <Pressable style={styles.retryBtn} onPress={() => router.replace("/recommendations")}>
           <Ionicons name="refresh" size={18} color="#fff" />
           <Text style={styles.retryText}>다른 추천 다시 보기</Text>
         </Pressable>
       </View>
     );
   }
-
-  if (!data) return null;
 
   return (
     <View style={styles.container}>
@@ -116,12 +109,9 @@ export default function ConfirmSelectedBouquet() {
             </View>
           </Animated.View>
 
-          <Animated.Text
-            style={[styles.mainMsg, { opacity: msgOpacity, transform: [{ translateY: msgY }] }]}
-          >
+          <Animated.Text style={[styles.mainMsg, { opacity: msgOpacity, transform: [{ translateY: msgY }] }]}>
             꽃다발이 선택되었어요
           </Animated.Text>
-
           <Text style={styles.subMsg}>당신의 마음을 담아, 더 아름답게 준비할게요.</Text>
         </View>
 
@@ -131,9 +121,7 @@ export default function ConfirmSelectedBouquet() {
 
         <View style={styles.metaArea}>
           <View style={{ alignItems: "center" }}>
-            <Text style={styles.titleText} numberOfLines={1}>
-              {data.title}
-            </Text>
+            <Text style={styles.titleText} numberOfLines={1}>{data.title}</Text>
             {data.floristName && (
               <View style={styles.floristPill}>
                 <Ionicons name="flower" size={12} color="#fff" />
@@ -142,11 +130,9 @@ export default function ConfirmSelectedBouquet() {
             )}
           </View>
 
-          {Array.isArray(data.palette) && data.palette.length > 0 && (
+          {data.palette?.length > 0 && (
             <View style={styles.paletteRow}>
-              {data.palette.slice(0, 5).map((c) => (
-                <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
-              ))}
+              {data.palette.slice(0, 5).map((c) => <View key={c} style={[styles.swatch, { backgroundColor: c }]} />)}
             </View>
           )}
         </View>
@@ -172,7 +158,6 @@ export default function ConfirmSelectedBouquet() {
   );
 }
 
-// (styles는 기존 ConfirmSelectedBouquet와 동일)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   scrollBody: { paddingHorizontal: 20, paddingTop: 28 },
@@ -210,6 +195,8 @@ const styles = StyleSheet.create({
   ctaGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#7A958E" },
   ctaGhostText: { color: "#7A958E", fontSize: 14, fontWeight: "800" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "#fff" },
+  loadingText: { marginTop: 12, color: "#666" },
+  errorText: { color: "#b91c1c", marginBottom: 16, textAlign: "center" },
   skeleton: { width: MAX_IMG_W, height: Math.round(MAX_IMG_W * 1.1), backgroundColor: "#f2f2f2", borderRadius: 16, marginTop: 16 },
   retryText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
   retryBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#7A958E", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24 },

@@ -15,6 +15,8 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { Asset } from 'expo-asset';
+
 
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
@@ -132,10 +134,16 @@ export default function Recommendations() {
     setRefreshing(false);
   }, [fetchRecommendations]);
 
+
   const onPressCard = (item: Bouquet) => {
+    const assetUri = Asset.fromModule(item.imageUrl).uri; // require 객체 → uri
     router.push({
       pathname: "/confirm",
-      params: { id: item.id, title: item.title, imageUrl: item.imageUrl, },
+      params: {
+        id: item.id,
+        title: item.title,
+        imageUrl: assetUri,
+      }
     });
   };
 

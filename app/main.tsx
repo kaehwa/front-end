@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, Pressable } from "react-native";
 import { router } from "expo-router";
+import { uploadImage, uploadAudio } from "./uploads";
 
 export default function ListeningMission() {
   const initialQuestions = [
@@ -35,6 +36,7 @@ export default function ListeningMission() {
   const [showNext, setShowNext] = useState(false);
 
   const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
+  const ID = "1"
 
   const expressions = [
     
@@ -119,9 +121,29 @@ export default function ListeningMission() {
 
   };
 
-  const handleUpload = () => {
-    // TODO: 사진/음성 업로드 로직
-  };
+const handleImageUpload = async () => {
+  // return;
+  try {
+    const result = await uploadImage(BACK_SWAGGER_URL, ID); // id와 baseUrl만 전달
+    alert("이미지 업로드 성공!");
+    console.log(result);
+  } catch (err) {
+    console.error(err);
+    alert("이미지 업로드 실패");
+  }
+};
+
+const handleAudioUpload = async () => {
+  try {
+    const result = await uploadAudio(BACK_SWAGGER_URL, ID); // id와 baseUrl만 전달
+    alert("오디오 업로드 성공!");
+    console.log(result);
+  } catch (err) {
+    console.error(err);
+    alert("오디오 업로드 실패");
+  }
+};
+
 
   async function postText(lstAnswer: string[]) {
     console.log("[DEBUG] START postText");
@@ -176,9 +198,14 @@ export default function ListeningMission() {
       {/* 입력란 및 버튼 */}
       <View style={styles.inputWrapper}>
         {showUpload ? (
-          <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
-            <Text style={styles.buttonText}>사진과 음성을 올려주세요.</Text>
-          </TouchableOpacity>
+          <View>
+            <TouchableOpacity style={styles.uploadButton} onPress={handleImageUpload}>
+              <Text style={styles.buttonText}>사진 업로드</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.uploadButton} onPress={handleAudioUpload}>
+              <Text style={styles.buttonText}>음성 업로드</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <TextInput
             style={[styles.input, { color: isTyping ? "#333" : "#999" }]}

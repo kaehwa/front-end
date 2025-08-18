@@ -13,6 +13,7 @@ import {
   Modal,            // ✅ 팝업용 추가
 } from "react-native";
 import { router } from "expo-router";
+import { uploadImage, uploadAudio } from "./uploads";
 
 export default function ListeningMission() {
   // ✅ 4단계 질문만 사용 (giver → receiver → story → upload)
@@ -31,14 +32,27 @@ export default function ListeningMission() {
   ];
 
   const [currentIndex, setCurrentIndex] = useState(0);
+<<<<<<< HEAD
   const [giver, setGiver] = useState("");                 // 주는 사람
   const [answers, setAnswers] = useState<string[]>(Array(4).fill("")); // 0:giver,1:receiver,2:story,3:files
   const [answer, setAnswer] = useState("");               // 텍스트 입력값
   const [placeHolder, setPlaceHolder] = useState(PLACEHOLDERS[0]);
   const [showUpload, setShowUpload] = useState(false);    // 3단계에서 업로드 UI
   const [showDoneModal, setShowDoneModal] = useState(false); // 완료 팝업
+=======
+  const [currentQuestion, setCurrentQuestion] = useState(initialQuestions[0]);
+  const [answers, setAnswers] = useState<string[]>(Array(initialQuestions.length).fill(""));
+  const [answer, setAnswer] = useState("");
+  const [placeHolder, setPlaceHolder] = useState("예) 여자친구, 엄마, 친구");
+  const [isTyping, setIsTyping] = useState(false);
+  const [inGiver, setInGiver] = useState("");
+  const [inReciver, setInReciver] = useState("");
+  // const [showUpload, setShowUpload] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+>>>>>>> jin
 
   const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
+  const ID = "2"
 
   // 마스코트 페이드/바운스
   const expressions = [
@@ -111,6 +125,29 @@ export default function ListeningMission() {
 
     // 다음 단계로 이동
     const nextIndex = currentIndex + 1;
+<<<<<<< HEAD
+=======
+    let reQuestion = initialQuestions[nextIndex];
+
+    // 커스터마이징 로직
+    if (currentIndex === 0) {
+      setInGiver(answer);
+      reQuestion = ` "${answer}" ${initialQuestions[nextIndex]}`;
+    } else if (currentIndex === 1) {
+      setInReciver(answer);
+      reQuestion = ` "${inGiver}"  님과 "${answer}" 님과의 관계는 어떻게 되나요?`;
+    } 
+    // else if (currentIndex === 3) {
+    //   reQuestion = `좋아요! ${inReciver} 님의 사진과 목소리를 업로드 해주시겠어요?`;
+    //   setShowUpload(true);
+    // } 
+    else {
+      reQuestion = initialQuestions[nextIndex]
+      // setShowUpload(false)
+    }
+    
+    setPlaceHolder(initialPlaceHolder[currentIndex])
+>>>>>>> jin
     setCurrentIndex(nextIndex);
     setPlaceHolder(PLACEHOLDERS[nextIndex] || "내용을 입력해주세요");
     setAnswer("");
@@ -118,6 +155,7 @@ export default function ListeningMission() {
     changeExpression();
   };
 
+<<<<<<< HEAD
   // 업로드 (샘플 구현)
   const [uploadDone, setUploadDone] = useState(false);
   const handleUpload = () => {
@@ -127,6 +165,31 @@ export default function ListeningMission() {
     setAnswers(nextAns);
     setUploadDone(true);
   };
+=======
+const handleImageUpload = async () => {
+  // return;
+  try {
+    const result = await uploadImage(BACK_SWAGGER_URL, ID); // id와 baseUrl만 전달
+    alert("이미지 업로드 성공!");
+    console.log(result);
+  } catch (err) {
+    console.error(err);
+    alert("이미지 업로드 실패");
+  }
+};
+
+const handleAudioUpload = async () => {
+  try {
+    const result = await uploadAudio(BACK_SWAGGER_URL, ID); // id와 baseUrl만 전달
+    alert("오디오 업로드 성공!");
+    console.log(result);
+  } catch (err) {
+    console.error(err);
+    alert("오디오 업로드 실패");
+  }
+};
+
+>>>>>>> jin
 
   // 완료 팝업 OK
   const handleModalOK = () => {
@@ -191,6 +254,7 @@ export default function ListeningMission() {
         />
       </Animated.View>
 
+<<<<<<< HEAD
       {/* 입력영역 */}
       <View style={styles.formArea}>
         {showUpload ? (
@@ -203,6 +267,20 @@ export default function ListeningMission() {
             </Text>
           </TouchableOpacity>
         ) : (
+=======
+      {/* 입력란 및 버튼 */}
+      <View style={styles.inputWrapper}>
+        {/* {showUpload ? (
+          <View>
+            <TouchableOpacity style={styles.uploadButton} onPress={handleImageUpload}>
+              <Text style={styles.buttonText}>사진 업로드</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.uploadButton} onPress={handleAudioUpload}>
+              <Text style={styles.buttonText}>음성 업로드</Text>
+            </TouchableOpacity>
+          </View>
+        ) : ( */}
+>>>>>>> jin
           <TextInput
             style={styles.input}
             placeholder={placeHolder}
@@ -211,7 +289,7 @@ export default function ListeningMission() {
             onChangeText={setAnswer}
             multiline
           />
-        )}
+        {/* )} */}
       </View>
 
       {/* 다음 버튼 */}

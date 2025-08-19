@@ -1,14 +1,15 @@
-import React, { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  View, Text, Image, Pressable, StyleSheet, Dimensions, Platform,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+  Image, StyleSheet, Dimensions, ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, Text, View} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { makeRedirectUri } from "expo-auth-session";
+import Constants from "expo-constants";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 
 // iOS에서 세션 처리
 WebBrowser.maybeCompleteAuthSession();
@@ -23,38 +24,118 @@ const ACCENT = "#7A958E";
 const DANBI = require("../assets/mascot/danbi_bouquet.png");
 
 // 🔑 실제 클라이언트 ID
-const WEB_CLIENT_ID = "936321092508-8j7f8k628ot253gvcro85q15j8nfc3oc.apps.googleusercontent.com";
-const IOS_CLIENT_ID = "936321092508-a15j26ok3i3ivjp3cjinkr86fvdvrrol.apps.googleusercontent.com";
+const BACKEND_URL = "http://4.240.103.29:8080"; // (필요하면 백엔드로도 전송 가능)
+const IOS_CLIENT_ID =
+  "2775008760-83po6j3tmnjor9ttbnc8meg0me21haik.apps.googleusercontent.com";
+const WEB_CLIENT_ID =
+  "2775008760-cu5dcieaua1pcl96ilfcg7p8egn4kqsg.apps.googleusercontent.com";
+const ANDROID_CLIENT_ID =
+  "2775008760-dj5uto76ve22ja4v68lvslrk3vkl3dbl.apps.googleusercontent.com";
+
+const FIREBASE_API_KEY = "AIzaSyDiECgmcmuSiHxESFLYNKayokU7gK03wfw";
+
+const isExpoGo = Constants.appOwnership === "expo";
+const redirectUri = isExpoGo
+  ? "https://auth.expo.io/@passionseona/gaehwa"
+  : makeRedirectUri({ scheme: "gaehwa" });
+
+WebBrowser.maybeCompleteAuthSession();
+
 
 export default function LoginScreen() {
-  const insets = useSafeAreaInsets();
 
-  // iOS + Web만 연결
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
   const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: WEB_CLIENT_ID,
+    clientId: WEB_CLIENT_ID,
     iosClientId: IOS_CLIENT_ID,
-    redirectUri: makeRedirectUri({
-      //useProxy: true, // Expo Go/Web 테스트 시 안전
-      // Dev Client/스토어 빌드에서는 useProxy:false + scheme:"gaehwa"
-    }),
-    scopes: ["openid", "profile", "email"], // 기본 스코프
+    androidClientId: ANDROID_CLIENT_ID || undefined,
+    redirectUri,
+    scopes: ["openid","email", "profile"],
+    responseType: "id_token" //"id_token", // id_token을 받아서 Firebase에 전달
   });
 
-  const onGoogleLogin = () => {
-    if (!request) return;
-    promptAsync({showInRecents: true });
-  };
-
+  /** ====== Auth 결과 핸들링 (여기서 Firebase REST API로 보냄) ====== */
   useEffect(() => {
-    if (response?.type === "success") {
-      const { authentication, params } = response;
-      console.log("✅ AccessToken:", authentication?.accessToken);
-      console.log("✅ IDToken:", params?.id_token);
+    (async () => {
+      if (!response) return;
 
-      // TODO: 백엔드로 토큰 보내서 세션 생성
-      router.replace("/main"); // 로그인 후 이동할 화면
-    }
+      // response에서 type과 id_token을 꺼냄
+      const type = response.type;
+      const id_token = response.params?.id_token;
+
+      console.log("response.type:", type);
+      console.log("response.params.id_token:", id_token);
+
+      if (type !== "success") {
+        alert("로그인 성공 id_token을 받지 못했습니다.");
+        return;
+      }
+
+      if (!id_token) {
+        alert("로그인 실패 id_token을 받지 못했습니다.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log("Phase")
+
+        const firebaseUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${FIREBASE_API_KEY}`;
+
+        const payload = {
+          postBody: `id_token=${id_token}&providerId=google.com`,
+          requestUri: redirectUri || "http://localhost",
+          returnIdpCredential: true,
+          returnSecureToken: true,
+        };
+
+        const res = await fetch(firebaseUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        console.log(data)
+        if (!res.ok) {
+          const errMsg = data?.error?.message ?? JSON.stringify(data);
+          throw new Error(`Firebase 로그인 실패: ${errMsg}`);
+        }
+
+        const firebaseIdToken = data.idToken;
+        const firebaseRefreshToken = data.refreshToken;
+        const displayName = data.displayName ?? data.email ?? "Unknown";
+        console.log(firebaseIdToken)
+        console.log(firebaseRefreshToken)
+        console.log(displayName)
+
+        const res_auth = await fetch(`${BACKEND_URL}/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id_token: firebaseIdToken }),
+        });
+        console.log(res_auth)
+
+        // if (firebaseIdToken) await SecureStore.setItemAsync("firebaseIdToken", firebaseIdToken);
+        // if (firebaseRefreshToken) await SecureStore.setItemAsync("firebaseRefreshToken", firebaseRefreshToken);
+        // await SecureStore.setItemAsync("userName", displayName);
+
+        router.replace("/main");
+      } catch (e: any) {
+        console.log("로그인 실패", e?.message ?? "알 수 없는 오류")
+        alert("로그인 실패");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [response]);
+
+    const onGoogleLogin = () => {
+      if (!request) return;
+      promptAsync();
+    };
+  
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -144,3 +225,4 @@ const styles = StyleSheet.create({
   googleText: { fontSize: 16, fontWeight: "800", color: TEXT },
   terms: { marginTop: 12, fontSize: 11, color: SUB, textAlign: "center" },
 });
+

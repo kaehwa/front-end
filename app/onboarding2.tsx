@@ -46,22 +46,26 @@ export default function Onboarding2() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#FFF2CC",
     paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 100,
   },
-  description: {
-    fontSize: 18,
-    fontWeight: "400",
+  scroll: {
+    justifyContent: "center",
+    flexGrow: 1,
+  },
+  text: {
+    fontSize: 17,
     color: "#444",
-    textAlign: "center",
-    lineHeight: 28,
+    lineHeight: 26,
+    marginBottom: 28,
   },
   nextButton: {
     position: "absolute",
-    bottom: 80,
-    backgroundColor: "#7A958E",
+    bottom: 60,
+    alignSelf: "center",
+    backgroundColor: "#FB7431",
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 30,
@@ -73,3 +77,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+

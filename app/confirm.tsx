@@ -35,6 +35,7 @@ type Data = {
   uri?: string;           // 원격일 때
   localKey?: LocalKey;    // 로컬일 때
   title?: string;
+  imageUrl: string;
   palette?: string[];
   floristName?: string;
 };
@@ -174,10 +175,7 @@ export default function ConfirmSelectedBouquet() {
         <Text style={{ color: "#b91c1c", marginBottom: 16, textAlign: "center" }}>{err}</Text>
         <Pressable style={styles.retryBtn} onPress={() => stableId && loadData(stableId)}>
           <Ionicons name="refresh" size={18} color="#fff" />
-          <Text style={styles.retryText}>다시 시도</Text>
-        </Pressable>
-        <Pressable style={[styles.linkBtn, { marginTop: 12 }]} onPress={() => router.replace("/recommendations")}>
-          <Text style={styles.linkBtnText}>다른 추천 다시 보기</Text>
+          <Text style={styles.retryText}>다른 추천 다시 보기</Text>
         </Pressable>
       </View>
     );
@@ -209,9 +207,7 @@ export default function ConfirmSelectedBouquet() {
 
         <View style={styles.metaArea}>
           <View style={{ alignItems: "center" }}>
-            <Text style={styles.titleText} numberOfLines={1}>
-              {data.title ?? "선택한 꽃다발"}
-            </Text>
+            <Text style={styles.titleText} numberOfLines={1}>{data.title}</Text>
             {data.floristName && (
               <View style={styles.floristPill}>
                 <Ionicons name="flower" size={12} color="#fff" />
@@ -220,11 +216,9 @@ export default function ConfirmSelectedBouquet() {
             )}
           </View>
 
-          {Array.isArray(data.palette) && data.palette.length > 0 && (
+          {data.palette?.length > 0 && (
             <View style={styles.paletteRow}>
-              {data.palette.slice(0, 5).map((c) => (
-                <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
-              ))}
+              {data.palette.slice(0, 5).map((c) => <View key={c} style={[styles.swatch, { backgroundColor: c }]} />)}
             </View>
           )}
         </View>

@@ -50,7 +50,7 @@ export default function Onboarding3() {
         ))}
       </ScrollView>
 
-      <Pressable style={styles.nextButton} onPress={() => router.push("/main")}>
+      <Pressable style={styles.nextButton} onPress={() => router.push("/login")}>
         <Text style={styles.nextButtonText}>다음</Text>
       </Pressable>
     </View>
@@ -92,4 +92,3 @@ const styles = StyleSheet.create({
   },
 });
 
-//nextpage.tsx 지우고 재진님 파일 연결하기 

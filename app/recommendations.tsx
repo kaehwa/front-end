@@ -12,11 +12,8 @@ import {
   Animated,
   Platform,
 } from "react-native";
-
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { Asset } from 'expo-asset';
-
 
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
@@ -74,6 +71,7 @@ export default function Recommendations() {
   const [error, setError] = useState<string | null>(null);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
 
+  // 하트 탭 애니메이션 값
   const scales = useRef<Record<string, Animated.Value>>({}).current;
   const getScale = (id: string) => {
     if (!scales[id]) scales[id] = new Animated.Value(1);
@@ -100,8 +98,6 @@ export default function Recommendations() {
   }, []);
 
   const fetchRecommendations = useCallback(async () => {
-    
-    console.log("call fetchRecommendations")
     setError(null);
     setLoading(true);
     try {
@@ -145,7 +141,6 @@ export default function Recommendations() {
 
       setItems(data.slice(0, 4));
     } catch (e: any) {
-      console.error("fetchRecommendations error:", e);
       setError("추천을 불러오는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.");
       setItems(null);
     } finally {
@@ -163,15 +158,10 @@ export default function Recommendations() {
     setRefreshing(false);
   }, [fetchRecommendations]);
 
-
   const onPressCard = (item: Bouquet) => {
     router.push({
       pathname: "/confirm",
-      params: {
-        id: item.id,
-        title: item.title,
-        imageUrl: assetUri,
-      }
+      params: { id: item.id, title: item.title },
     });
   };
 
@@ -259,6 +249,7 @@ export default function Recommendations() {
   );
 }
 
+/** ====== 개별 카드 컴포넌트 ====== */
 function Card({
   item,
   liked,
@@ -313,6 +304,7 @@ function Card({
           )}
         </View>
       </View>
+
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>
           {item.title}
@@ -342,6 +334,7 @@ function Card({
   );
 }
 
+/** ====== 스타일 ====== */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -443,10 +436,30 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
-  imageWrap: { width: "100%", height: CARD_H, backgroundColor: "#f2f2f2" },
-  image: { width: "100%", height: "100%" },
-  likeBtn: { position: "absolute", right: 8, top: 8, backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 20, padding: 6 },
-  badgeRow: { position: "absolute", left: 8, bottom: 8, flexDirection: "row", gap: 6 },
+  imageWrap: {
+    width: "100%",
+    height: CARD_H,
+    backgroundColor: "#f2f2f2",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  likeBtn: {
+    position: "absolute",
+    right: 8,
+    top: 8,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderRadius: 20,
+    padding: 6,
+  },
+  badgeRow: {
+    position: "absolute",
+    left: 8,
+    bottom: 8,
+    flexDirection: "row",
+    gap: 6,
+  },
   badge: {
     flexDirection: "row",
     alignItems: "center",

@@ -15,7 +15,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { resolveDiscoveryAsync } from "expo-auth-session";
+import { Buffer } from "buffer";
+// import { resolveDiscoveryAsync } from "expo-auth-session";
+
 
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
@@ -24,7 +26,7 @@ const CARD_W = Math.floor((width - H_PADDING * 2 - GAP) / 2);
 const CARD_H = Math.floor(CARD_W * 1.35);
 
 const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
-const ID = "1"
+const ID = "24"
 
 const BG = "#FFF4DA";
 const WHITE = "#FFFFFF";
@@ -58,6 +60,23 @@ type Bouquet = {
   floristName?: string;
   score?: number;
 };
+
+function escapedHexToBase64(escapedStr: string) {
+  // "xffxd8xffxe0..." → ["ff","d8","ff","e0", ...]
+  const hexArr = escapedStr.match(/x([0-9a-f]{2})/gi)?.map((h) =>
+    parseInt(h.replace(/^x/, ""), 16)
+  ) || [];
+
+  // Buffer로 변환 → Base64
+  return Buffer.from(hexArr).toString("base64");
+}
+// function escapedHexToBase64(escapedStr: string) {
+//   const hexArr = escapedStr.match(/x([0-9a-f]{2})/gi)?.map(h =>
+//     parseInt(h.replace(/^x/, ""), 16)
+//   ) || [];
+//   return Buffer.from(hexArr).toString("base64");
+// }
+
 
 export default function Recommendations() {
   const router = useRouter();
@@ -101,6 +120,9 @@ export default function Recommendations() {
     })();
   }, []);
 
+
+
+
   const fetchRecommendations = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -115,11 +137,11 @@ export default function Recommendations() {
       const raw: any[] = await res.json();
       setLoading(false)
       console.log(raw)
+
       const resData: Bouquet[] = raw.map((r) => ({
         id: r.id,
         title: r.name,                   // name → title
-        imageBase64: r.imageBase64,      // base64 이미지
-        // palette: r.rgb || [],            // rgb 배열
+        imageBase64: r.imageBase64,//escapedHexToBase64(r.imageBase64), //r.imageBase64,
         palette: r.rgb ? r.rgb.map(([r, g, b]) => `rgb(${r}, ${g}, ${b})`) : [],
       }));
       
@@ -279,7 +301,7 @@ function Card({
     : item.imageUrl
     ? { uri: item.imageUrl }
     : undefined;
-
+  console.log(imgSource.length)
   return (
     <Pressable
       style={({ pressed }) => [
@@ -343,6 +365,9 @@ function Card({
     </Pressable>
   );
 }
+
+
+
 
 /** ====== 스타일 ====== */
 const styles = StyleSheet.create({

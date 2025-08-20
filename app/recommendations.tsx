@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { resolveDiscoveryAsync } from "expo-auth-session";
 
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
@@ -22,7 +23,8 @@ const GAP = 12;
 const CARD_W = Math.floor((width - H_PADDING * 2 - GAP) / 2);
 const CARD_H = Math.floor(CARD_W * 1.35);
 
-const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
+const ID = "1"
 
 const BG = "#FFF4DA";
 const WHITE = "#FFFFFF";
@@ -49,6 +51,7 @@ type Bouquet = {
   title: string;
   imageUrl?: string;
   imageLocal?: LocalBouquetKey;
+  imageBase64?: string;   
   price?: number;
   tags?: string[];
   palette?: string[];
@@ -102,50 +105,31 @@ export default function Recommendations() {
     setError(null);
     setLoading(true);
     try {
-      // const res = await fetch(
-      //   `${BACKEND_URL}/api/recommendations?giver=${encodeURIComponent(meta.giver)}&receiver=${encodeURIComponent(meta.receiver)}&occasion=${encodeURIComponent(meta.occasion)}`
-      // );
-      // const data: Bouquet[] = await res.json();
+      const res = await fetch(
+        `${BACKEND_URL}/flowers/${ID}/similar`
+      );
+      setLoading(true)
+      console.log(res)
+      
+      
+      const raw: any[] = await res.json();
+      setLoading(false)
+      console.log(raw)
+      const resData: Bouquet[] = raw.map((r) => ({
+        id: r.id,
+        title: r.name,                   // name → title
+        imageBase64: r.imageBase64,      // base64 이미지
+        // palette: r.rgb || [],            // rgb 배열
+        palette: r.rgb ? r.rgb.map(([r, g, b]) => `rgb(${r}, ${g}, ${b})`) : [],
+      }));
+      
+      console.log("resData")
+      console.log(resData)
 
-      // 데모/폴백 데이터 (price 추가)
-      const data: Bouquet[] = [
-        {
-          id: "r1",
-          title: "라벤더 포에틱",
-          imageLocal: "r1",
-          price: 68000,
-          tags: ["은은함", "라벤더", "편안함"],
-          palette: ["#b5a6d3", "#f6f2ff", "#7557a2"],
-        },
-        {
-          id: "r2",
-          title: "선셋 로즈믹스",
-          imageLocal: "r2",
-          price: 72000,
-          tags: ["축하", "장미", "따뜻함"],
-          palette: ["#ffb4a2", "#ffd6a5", "#ffadad"],
-        },
-        {
-          id: "r3",
-          title: "포레스트 브리즈",
-          imageLocal: "r3",
-          price: 59000,
-          tags: ["그린", "싱그러움", "위로"],
-          palette: ["#9dc9a5", "#e6f4ea", "#5f8f6b"],
-        },
-        {
-          id: "r4",
-          title: "아이보리 세레나데",
-          imageLocal: "r4",
-          price: 64000,
-          tags: ["감성", "미니멀", "우아"],
-          palette: ["#f2efe9", "#e2dcd0", "#b3a893"],
-        },
-      ];
-
-      setItems(data.slice(0, 4));
+      setItems(resData.slice(0, 4));
     } catch (e: any) {
       setError("추천을 불러오는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.");
+      console.log(e)
       setItems(null);
     } finally {
       setLoading(false);
@@ -284,12 +268,17 @@ function Card({
   onToggleLike: () => void;
   scale: Animated.Value;
 }) {
-  const imgSource =
-    item.imageLocal
-      ? LOCAL_BOUQUETS[item.imageLocal]
-      : item.imageUrl
-      ? { uri: item.imageUrl }
-      : undefined;
+  // const imgSource =
+  //   item.imageLocal
+  //     ? LOCAL_BOUQUETS[item.imageLocal]
+  //     : item.imageUrl
+  //     ? { uri: item.imageUrl }
+  //     : undefined;
+  const imgSource = item.imageBase64
+    ? { uri: `data:image/jpeg;base64,${item.imageBase64}` }
+    : item.imageUrl
+    ? { uri: item.imageUrl }
+    : undefined;
 
   return (
     <Pressable

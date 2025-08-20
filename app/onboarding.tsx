@@ -112,12 +112,13 @@ export default function Onboarding() {
     </Text>
   </View>
 
-  <Text style={styles.subtitle}>
-    꽃에 메세지를 더해, 마음을 완성합니다
+  {/* 서브카피 */}
+  <Text style={[styles.subtitle]}>
+  꽃에 메세지를 더해, 마음을 완성합니다
   </Text>
 
         {/* CTA */}
-        <Pressable style={styles.button} onPress={() => router.push("/main")}>
+        <Pressable style={styles.button} onPress={() => router.push("/onboarding2")}>
           <Text style={styles.buttonText}>시작하기</Text>
         </Pressable>
       </View>

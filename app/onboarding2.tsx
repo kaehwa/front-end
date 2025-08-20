@@ -1,56 +1,101 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated, Pressable, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  ScrollView,
+  Image,
+  Pressable,
+  Dimensions,
+} from "react-native";
 import { router } from "expo-router";
 
-export default function Onboarding3() {
-  const lines = [
-    "꽃을 선물할 대상을 선택하세요 – 사랑하는 사람, 혹은 나 자신",
-    "상황과 이야기를 담아주세요 – 생일, 축하, 위로, 추억",
-    "AI가 그 마음에 가장 어울리는 꽃과 디자인을 추천하고,\n당신의 사진과 목소리를 담은 디지털 카드를 완성해 드립니다.",
-    "그 마음은 제휴 플로리스트의 손끝에서\n실물 꽃다발로 피어나, 사랑하는 이의 손에 전해집니다.",
-    "오늘, 당신의 이야기를 꽃으로 남겨보세요."
+const { width } = Dimensions.get("window");
+
+// 단비 아바타 (로컬 이미지 사용)
+const danbiAvatar = require("../assets/mascot/danbi_face.png");
+
+export default function OnboardingChat() {
+  const conversation = [
+    { type: "user", text: "꽃을 어떻게 선물하나요?" },
+    { type: "danbi", text: "꽃을 선물할 대상을 선택하세요 – 사랑하는 사람, 혹은 나 자신" },
+    { type: "user", text: "그 다음은요?" },
+    { type: "danbi", text: "상황과 이야기를 담아주세요 – 생일, 축하, 위로, 추억" },
+    { type: "user", text: "AI는 뭘 해주나요?" },
+    { type: "danbi", text: "AI가 마음에 어울리는 꽃과 디자인을 추천하고,\n당신의 사진과 목소리를 담은 디지털 카드를 완성해 드려요." },
+    { type: "user", text: "실물도 받을 수 있나요?" },
+    { type: "danbi", text: "네, 제휴 플로리스트가 실물 꽃다발로 제작해 사랑하는 이의 손에 전해드립니다." },
+    { type: "danbi", text: "오늘, 당신의 이야기를 꽃으로 남겨보세요." },
   ];
 
-  // 문장 수만큼 애니메이션 값 생성 (한 번만)
   const animations = useRef(
-    lines.map(() => ({
-      y: new Animated.Value(30),
+    conversation.map(() => ({
+      y: new Animated.Value(20),
       opacity: new Animated.Value(0),
     }))
   ).current;
 
   useEffect(() => {
     const anim = Animated.stagger(
-      400,
-      animations.map(a =>
+      500,
+      animations.map((a) =>
         Animated.parallel([
-          Animated.timing(a.y, { toValue: 0, duration: 700, useNativeDriver: true }),
-          Animated.timing(a.opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+          Animated.timing(a.y, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(a.opacity, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
         ])
       )
     );
     anim.start();
-    // 언마운트 시 안전 정지
-    return () => anim.stop && anim.stop();
   }, [animations]);
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        {lines.map((line, index) => (
-          <Animated.Text
+        {conversation.map((msg, index) => (
+          <Animated.View
             key={index}
-            style={[
-              styles.text,
-              { transform: [{ translateY: animations[index].y }], opacity: animations[index].opacity }
-            ]}
+            style={{
+              transform: [{ translateY: animations[index].y }],
+              opacity: animations[index].opacity,
+              flexDirection: msg.type === "danbi" ? "row" : "row-reverse",
+              marginBottom: 18,
+            }}
           >
-            {line}
-          </Animated.Text>
+            {msg.type === "danbi" && (
+              <Image source={danbiAvatar} style={styles.avatar} />
+            )}
+            <View
+              style={[
+                styles.bubble,
+                msg.type === "user" ? styles.userBubble : styles.danbiBubble,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.text,
+                  msg.type === "user" ? styles.userText : styles.danbiText,
+                ]}
+              >
+                {msg.text}
+              </Text>
+            </View>
+          </Animated.View>
         ))}
       </ScrollView>
 
-      <Pressable style={styles.nextButton} onPress={() => router.push("/main")}>
+      <Pressable
+        style={styles.nextButton}
+        onPress={() => router.push("/login")}
+      >
         <Text style={styles.nextButtonText}>다음</Text>
       </Pressable>
     </View>
@@ -60,35 +105,60 @@ export default function Onboarding3() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF2CC",
-    paddingHorizontal: 24,
-    paddingTop: 60,
+    backgroundColor: "#FFFDF8",
+    paddingHorizontal: 16,
+    paddingTop: 40,
     paddingBottom: 100,
   },
   scroll: {
-    justifyContent: "center",
     flexGrow: 1,
+    justifyContent: "flex-end",
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+    alignSelf: "flex-end",
+  },
+  bubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    maxWidth: width * 0.7,
+  },
+  danbiBubble: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  userBubble: {
+    backgroundColor: "#FB7431",
   },
   text: {
-    fontSize: 17,
-    color: "#444",
-    lineHeight: 26,
-    marginBottom: 28,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  danbiText: {
+    color: "#333",
+  },
+  userText: {
+    color: "#fff",
+    fontWeight: "500",
   },
   nextButton: {
     position: "absolute",
-    bottom: 60,
+    bottom: 40,
     alignSelf: "center",
     backgroundColor: "#FB7431",
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 30,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 40,
     elevation: 3,
   },
   nextButtonText: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
   },
 });
-

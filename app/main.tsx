@@ -15,6 +15,9 @@ import {
 import { router } from "expo-router";
 import { uploadImage, uploadAudio } from "./uploads";
 
+//음성녹음 처리
+import Recording from "./audio";
+
 export default function ListeningMission() {
   /** 질문 & 플레이스홀더 */
   const QUESTIONS = [
@@ -39,6 +42,8 @@ export default function ListeningMission() {
   const [placeHolder, setPlaceHolder] = useState(PLACEHOLDERS[0]);
   const [showUpload, setShowUpload] = useState(false);
   const [showDoneModal, setShowDoneModal] = useState(false);
+
+  const [showRecordingModal, setShowRecordingModal] = useState(false);
 
   // 업로드 상태
   const [imageDone, setImageDone] = useState(false);
@@ -114,6 +119,8 @@ export default function ListeningMission() {
       alert("오디오 업로드 실패");
     }
   };
+
+  
 
   /** 다음 버튼 핸들러 (업로드 단계 제외) */
   const handleNext = async () => {
@@ -233,7 +240,8 @@ export default function ListeningMission() {
 
             <TouchableOpacity
               style={[styles.uploadBtn, audioDone && { opacity: 0.8, marginTop: 12 }]}
-              onPress={handleAudioUpload}
+              onPress={() => setShowRecordingModal(true)}
+              // onPress={handleAudioUpload}
             >
               <Text style={styles.uploadText}>
                 {audioDone ? "음성 업로드 완료 ✓" : "음성 올리기"}
@@ -287,6 +295,22 @@ export default function ListeningMission() {
           </View>
         </View>
       </Modal>
+
+      {/* 음성 완료 팝업 */}
+      <Modal
+        visible={showRecordingModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRecordingModal(false)}
+      >
+        <View style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(0,0,0,0.35)' }}>
+          <View style={{ width:'90%', backgroundColor:'#fff', borderRadius:12, padding:16 }}>
+            <Recording onClose={() => setShowRecordingModal(false)} />
+          </View>
+        </View>
+      </Modal>
+
+      
     </SafeAreaView>
   );
 }

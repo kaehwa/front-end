@@ -59,6 +59,8 @@ export const uploadImage = async (baseUrl: string, id: string) => {  try {
  * @param id path parameter
  */
 export const uploadAudio = async (baseUrl: string, id: string) => {
+
+  const { isRecording, recordedUri, startRecording, stopRecording, saveRecording } = useRecording();
   try {
     // 1. 오디오 파일 선택
     const audioResult = await DocumentPicker.getDocumentAsync({

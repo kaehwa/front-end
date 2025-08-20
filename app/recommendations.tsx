@@ -61,23 +61,6 @@ type Bouquet = {
   score?: number;
 };
 
-function escapedHexToBase64(escapedStr: string) {
-  // "xffxd8xffxe0..." → ["ff","d8","ff","e0", ...]
-  const hexArr = escapedStr.match(/x([0-9a-f]{2})/gi)?.map((h) =>
-    parseInt(h.replace(/^x/, ""), 16)
-  ) || [];
-
-  // Buffer로 변환 → Base64
-  return Buffer.from(hexArr).toString("base64");
-}
-// function escapedHexToBase64(escapedStr: string) {
-//   const hexArr = escapedStr.match(/x([0-9a-f]{2})/gi)?.map(h =>
-//     parseInt(h.replace(/^x/, ""), 16)
-//   ) || [];
-//   return Buffer.from(hexArr).toString("base64");
-// }
-
-
 export default function Recommendations() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -119,9 +102,6 @@ export default function Recommendations() {
       }
     })();
   }, []);
-
-
-
 
   const fetchRecommendations = useCallback(async () => {
     setError(null);

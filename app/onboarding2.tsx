@@ -1,42 +1,56 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated, Dimensions, Pressable } from "react-native";
+import { View, Text, StyleSheet, Animated, Pressable, ScrollView } from "react-native";
 import { router } from "expo-router";
 
-const { width, height } = Dimensions.get("window");
+export default function Onboarding3() {
+  const lines = [
+    "꽃을 선물할 대상을 선택하세요 – 사랑하는 사람, 혹은 나 자신",
+    "상황과 이야기를 담아주세요 – 생일, 축하, 위로, 추억",
+    "AI가 그 마음에 가장 어울리는 꽃과 디자인을 추천하고,\n당신의 사진과 목소리를 담은 디지털 카드를 완성해 드립니다.",
+    "그 마음은 제휴 플로리스트의 손끝에서\n실물 꽃다발로 피어나, 사랑하는 이의 손에 전해집니다.",
+    "오늘, 당신의 이야기를 꽃으로 남겨보세요."
+  ];
 
-export default function Onboarding2() {
-  const textY = useRef(new Animated.Value(50)).current;
-  const textOpacity = useRef(new Animated.Value(0)).current;
+  // 문장 수만큼 애니메이션 값 생성 (한 번만)
+  const animations = useRef(
+    lines.map(() => ({
+      y: new Animated.Value(30),
+      opacity: new Animated.Value(0),
+    }))
+  ).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(textY, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(textOpacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    const anim = Animated.stagger(
+      400,
+      animations.map(a =>
+        Animated.parallel([
+          Animated.timing(a.y, { toValue: 0, duration: 700, useNativeDriver: true }),
+          Animated.timing(a.opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      )
+    );
+    anim.start();
+    // 언마운트 시 안전 정지
+    return () => anim.stop && anim.stop();
+  }, [animations]);
 
   return (
     <View style={styles.container}>
-      <Animated.Text
-        style={[
-          styles.description,
-          { transform: [{ translateY: textY }], opacity: textOpacity },
-        ]}
-      >
-        우리는 말로 다 전하지 못한 마음을 꽃으로 기록합니다.{"\n"}
-        기쁨도, 위로도, 그리고 오래 남길 그리움도,{"\n"}
-        당신의 순간은 한 송이 꽃이 되어 피어납니다.
-      </Animated.Text>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {lines.map((line, index) => (
+          <Animated.Text
+            key={index}
+            style={[
+              styles.text,
+              { transform: [{ translateY: animations[index].y }], opacity: animations[index].opacity }
+            ]}
+          >
+            {line}
+          </Animated.Text>
+        ))}
+      </ScrollView>
 
-      <Pressable style={styles.nextButton} onPress={() => router.push("/onboarding3")}>
+      <Pressable style={styles.nextButton} onPress={() => router.push("/main")}>
         <Text style={styles.nextButtonText}>다음</Text>
       </Pressable>
     </View>
@@ -77,5 +91,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
 

@@ -50,10 +50,7 @@ export default function ListeningMission() {
 
   /** 마스코트 이미지 + 애니메이션 */
   const expressions = [
-    require("./../assets/mascot/danbi.jpg"),
-    require("./../assets/mascot/danbi.jpg"),
-    require("./../assets/mascot/danbi.jpg"),
-    require("./../assets/mascot/danbi.jpg"),
+    require("./../assets/mascot/danbi.jpg")
   ];
   const [currentExpressionIndex, setCurrentExpressionIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -93,10 +90,7 @@ export default function ListeningMission() {
   }, [currentIndex]);
 
   /** 현재 질문 */
-  const currentQuestion = QUESTIONS[currentIndex].replace(
-    /\{giver\}/g,
-    giver || "OOO"
-  );
+  const currentQuestion = QUESTIONS[currentIndex].replace(/\{giver\}/g, giver || "OOO");
 
   /** 업로드 핸들러 */
   const handleImageUpload = async () => {
@@ -121,7 +115,7 @@ export default function ListeningMission() {
     }
   };
 
-  /** 다음 버튼 핸들러 */
+  /** 다음 버튼 핸들러 (업로드 단계 제외) */
   const handleNext = async () => {
     if (!showUpload) {
       const trimmed = answer.trim();
@@ -129,27 +123,21 @@ export default function ListeningMission() {
       nextAns[currentIndex] = trimmed;
       setAnswers(nextAns);
       if (currentIndex === 0) setGiver(trimmed);
-    } else {
-      // 업로드 단계: 값 설정
-      const nextAns = [...answers];
-      nextAns[3] = "uploaded";
-      setAnswers(nextAns);
-    }
 
-    if (currentIndex === QUESTIONS.length - 1) {
-      await postText(answers);
-      setShowDoneModal(true);
-      return;
-    }
+      const nextIndex = currentIndex + 1;
+      if (nextIndex >= QUESTIONS.length) return;
 
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex);
-    setPlaceHolder(PLACEHOLDERS[nextIndex] || "내용을 입력해주세요");
-    setAnswer("");
-    setShowUpload(nextIndex === 3);
-    setImageDone(false);
-    setAudioDone(false);
-    changeExpression();
+      setCurrentIndex(nextIndex);
+      setPlaceHolder(PLACEHOLDERS[nextIndex] || "내용을 입력해주세요");
+      setAnswer("");
+      const willUpload = nextIndex === 3;
+      setShowUpload(willUpload);
+      if (willUpload) {
+        setImageDone(false);
+        setAudioDone(false);
+      }
+      changeExpression();
+    }
   };
 
   /** 서버 전송 */
@@ -175,14 +163,27 @@ export default function ListeningMission() {
     }
   }
 
+  /** 업로드 단계 자동 완료: 둘 다 끝나면 즉시 전송 & 팝업 */
+  const completedRef = useRef(false);
+  useEffect(() => {
+    if (showUpload && imageDone && audioDone && !completedRef.current) {
+      completedRef.current = true; // 중복 방지
+      const nextAns = [...answers];
+      nextAns[3] = "uploaded";
+      setAnswers(nextAns);
+
+      (async () => {
+        await postText(nextAns);
+        setShowDoneModal(true);
+      })();
+    }
+  }, [showUpload, imageDone, audioDone, answers]);
+
   /** 완료 팝업 */
   const handleModalOK = () => {
     setShowDoneModal(false);
     router.push("/recommendations");
   };
-
-  /** 다음 버튼 활성화 여부 */
-  const canNext = !showUpload || (imageDone && audioDone);
 
   /** UI */
   return (
@@ -251,18 +252,21 @@ export default function ListeningMission() {
         )}
       </View>
 
-      {/* 다음 / 건너뛰기 버튼 */}
-      <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
-        <TouchableOpacity
-          style={[styles.cta, !canNext && { opacity: 0.5 }]}
-          onPress={handleNext}
-          disabled={!canNext}
-        >
-          <Text style={styles.ctaText}>
-            {currentIndex === QUESTIONS.length - 1 ? "완료" : "다음"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* 다음 버튼: 업로드 단계에선 아예 숨김 */}
+      {!showUpload && (
+        <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+          <TouchableOpacity
+            style={[
+              styles.cta,
+              answer.trim().length === 0 && { opacity: 0.5 },
+            ]}
+            onPress={handleNext}
+            disabled={answer.trim().length === 0}
+          >
+            <Text style={styles.ctaText}>다음</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* 완료 팝업 */}
       <Modal

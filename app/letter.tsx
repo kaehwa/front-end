@@ -76,11 +76,16 @@ export default function LetterPage() {
       const json: LetterResponse = {
         letter:
           `${name ?? "사랑하는 사람"}에게,\n\n` +
-          `당신의 하루에 작은 꽃 한 송이의 향기가 닿기를 바라며, \n` +
-          `이 마음을 조심스레 전합니다. 어제보다 오늘이, 오늘보다 내일이 \n` +
-          `조금 더 다정해지길. 당신의 미소가 피어나는 그 순간까지, \n` +
-          `나는 늘 여기에서 마음을 모으고 있을게요.\n\n` +
-          `그대, 화(花)야로 보냅니다.`,
+          `오늘은 우리 둘만의 세 번째 계절이 흐른 날이야., \n` +
+          `제주 바람에 실려 웃던 네 목소리, \n` +
+          `푸른 바다를 배경으로 마주 잡았던 손길이 아직도 내 마음을 따뜻하게 감싸고 있어. \n` +
+
+          `세 해 동안 함께한 순간들이 꽃잎처럼 차곡차곡 쌓여,이제는 하나의 큰 꽃다발이 되어 피어났네. \n` +
+          `그 안에는 우리의 웃음, 서로의 위로, 끝없는 사랑이 담겨 있어.\n\n` +
+          `이 특별한 날, 그 꽃다발을 지현 너에게 전하고 싶어. \n` +
+          `오늘도, 내일도, 그리고 앞으로의 모든 날도 함께 피어나고 싶어.. \n`+
+          `사랑해, 늘.\n\n`,
+          
         recipient: name ?? "사랑하는 사람",
         tone: "따뜻한 위로",
       };
@@ -201,7 +206,7 @@ export default function LetterPage() {
           {/* 라벨 & 카운터 */}
           <View style={styles.cardTopRow}>
             <View style={styles.pill}>
-              <Ionicons name="create-outline" size={14} color="#7A958E" />
+              <Ionicons name="create-outline" size={14} color="#FB7431" />
               <Text style={styles.pillText}>{editing ? "편집 중" : "초안"}</Text>
             </View>
             <Text style={styles.counterText}>
@@ -363,16 +368,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(122,149,142,0.12)",
+    backgroundColor: "rgba(255, 242, 204, 1)",
     borderWidth: 1,
-    borderColor: "rgba(122,149,142,0.35)",
+    borderColor: "rgba(214, 215, 118, 0.35)",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
-  pillText: { color: "#5f776f", fontSize: 12, fontWeight: "700" },
+  pillText: { color: "#FB7431", fontSize: 12, fontWeight: "700" },
 
-  counterText: { color: "#6b7280", fontSize: 12 },
+  counterText: { color: "#7d806bff", fontSize: 12 },
 
   letterText: {
     color: "#27333a",

@@ -1,312 +1,580 @@
 // app/card.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Image, ActivityIndicator,
-  Pressable, Dimensions, Animated, Share, Alert, Platform,
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  Pressable,
+  Animated,
+  Alert,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
+import { Video, ResizeMode, AVPlaybackStatusSuccess, Audio } from "expo-av";
 
-const { width } = Dimensions.get("window");
-const H_PADDING = 20;
-const CARD_W = Math.min(380, width - H_PADDING * 2);
-const CARD_RADIUS = 24;
-const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // TODO: 실제 주소로 교체
+// ── 화면/카드 치수 ───────────────────────────────────────────────────────────
+const { width, height } = Dimensions.get("window");
+const CARD_W = Math.min(380, width - 40);
+const PHOTO_H = Math.round(CARD_W * 0.9);
+const SHEET_H = Math.min(520, Math.round(height * 0.72));
+const SHEET_PEEK = 36;
+const PAGE_BG = "#F5EFE3";
 
+// ── 종이 텍스처 ─────────────────────────────────────────────────────────────
+const PAPER_TEXTURE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAGXRFWHRTb2Z0d2FyZQBwYXBlci1ub2lzZS1nZW4gMS4wAAAAPElEQVQYV2NkYGD4z8DAwPCfGQYGBgYmBqYyYGBg8H8YjEGEhQm8Dg0EwYGBgYGJgYBgYGBoYH8AEgkAQt1mA1kAAAAASUVORK5CYII=";
+
+// ── ✅ 로컬 비디오 (Option A: require) ──────────────────────────────────────
+const LOCAL_VIDEO = require("../assets/videos/file.mp4");
+const CORNER_TAPE = require("../assets/images/tape.png"); // 모서리용 찢어진 테이프 PNG
+
+// ── 타입 ────────────────────────────────────────────────────────────────────
 type CardPayload = {
   id: string;
   letter: string;
-  bouquetTitle?: string;
-  bouquetImageUrl?: string;
-  bouquetGif?: string;
-  videoUrl?: string | null;
-  shareUrl?: string;
-  badgeText?: string;
+  videoUrl?: string | null;     // 원격 URL(선택)
+  videoLocal?: number | null;   // 🔹 로컬 require
+  audioUrl?: string | null;
+  coverImageUrl?: string | null;
+  createdAtIso?: string | null;
+  recipientName?: string | null;
 };
 
+// ── 유틸 ────────────────────────────────────────────────────────────────────
+function formatKoDate(d = new Date()) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}.${mm}.${dd}.`;
+}
+
+// ── 컴포넌트 ────────────────────────────────────────────────────────────────
 export default function CardScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, to } = useLocalSearchParams<{ id?: string; to?: string }>();
   const insets = useSafeAreaInsets();
 
   const [data, setData] = useState<CardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // 애니메이션 값 (ref로 재사용)
-  const cardY = useRef(new Animated.Value(16)).current;
-  const cardOpacity = useRef(new Animated.Value(0)).current;
+  // Media
+  const videoRef = useRef<Video>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isEnded, setIsEnded] = useState(false);
+  const [mediaDurationMs, setMediaDurationMs] = useState<number>(0);
+  const soundRef = useRef<Audio.Sound | null>(null); // (옵션) 오디오 길이만 참조
 
-  // 중복 실행 가드 & 언마운트 가드
-  const fetchedRef = useRef(false);
-  const animatedRef = useRef(false);
-  const mountedRef = useRef(true);
+  // Banner / hint
+  const sheetY = useRef(new Animated.Value(SHEET_H - SHEET_PEEK)).current;
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const hintOpacity = useRef(new Animated.Value(0)).current; // 영상 종료 후 배너 가이드
+
+  // Letter reveal
+  const [visibleLineCount, setVisibleLineCount] = useState(0); // (상태는 보존)
+  const revealTimers = useRef<number[]>([]);
+  const lines = useMemo(() => {
+    const text = data?.letter ?? "";
+    return text
+      .split("\n")
+      .map((l) => l.trimEnd())
+      .filter((l, i, arr) => !(l === "" && (arr[i - 1] ?? "") === ""));
+  }, [data?.letter]);
+
+  // 라인 애니메이션 값
+  const lineAnims = useRef<{ opacity: Animated.Value; ty: Animated.Value }[]>([]);
   useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+    if (lineAnims.current.length !== lines.length) {
+      lineAnims.current = lines.map(
+        (_, i) =>
+          lineAnims.current[i] ?? {
+            opacity: new Animated.Value(0),
+            ty: new Animated.Value(8),
+          }
+      );
+    }
+  }, [lines]);
 
-  const runIntroOnce = useCallback(() => {
-    if (animatedRef.current) return;
-    animatedRef.current = true;
-    Animated.parallel([
-      Animated.timing(cardY, { toValue: 0, duration: 450, useNativeDriver: true }),
-      Animated.timing(cardOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
-    ]).start();
-  }, [cardOpacity, cardY]);
+  const stableId = typeof id === "string" ? id : id ? String(id) : "";
+  const fetchedRef = useRef(false);
 
+  // ── Fetch (데모 데이터) ───────────────────────────────────────────────────
   const fetchCard = useCallback(async (cardId: string) => {
-    if (!cardId) return;
-    if (fetchedRef.current) return; // 한 번만
+    if (!cardId || fetchedRef.current) return;
     fetchedRef.current = true;
-
     setErr(null);
     setLoading(true);
     try {
-      // 실제 API 예시
-      // const res = await fetch(`${BACKEND_URL}/api/cards/${encodeURIComponent(cardId)}`);
-      // if (!res.ok) throw new Error("fetch_failed");
-      // const json: CardPayload = await res.json();
+      // 실제 API 사용 시: videoLocal 대신 videoUrl을 내려주면 됩니다.
 
-      // 데모 데이터
+      // ✅ 데모: 로컬 비디오 사용
       const json: CardPayload = {
         id: String(cardId),
         letter:
-          "사랑하는 당신에게,\n\n" +
-          "오늘 내 마음을 꽃으로 전해요. 바쁜 하루 속에서도\n" +
-          "이 카드가 작은 쉼표가 되길 바라요.\n\n" +
+          "사랑하는 당신에게,\n" +
+          "오늘 내 마음을 꽃으로 전해요.\n" +
+          "바쁜 하루 속에서도 이 카드가 작은 쉼표가 되길 바라요.\n" +
           "늘 곁에 있을게요.\n그대, 화(花)야와 함께.",
-        bouquetTitle: "라벤더 포에틱",
-        bouquetImageUrl: "https://picsum.photos/seed/finalbouquet/1200/1600",
         videoUrl: null,
-        shareUrl: `https://gaehwa.app/card/${cardId}`,
-        badgeText: "완성",
+        videoLocal: LOCAL_VIDEO,      // 🔹 핵심
+        audioUrl: null,
+        coverImageUrl: "https://picsum.photos/seed/polar/1200/1600",
+        createdAtIso: null,
+        recipientName: null,
       };
-
-      if (!mountedRef.current) return;
       setData(json);
-      // 애니메이션은 한 번만
-      requestAnimationFrame(runIntroOnce);
     } catch (e) {
-      if (!mountedRef.current) return;
       setErr("카드 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
-      setData(null);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      setLoading(false);
     }
-  }, [runIntroOnce]);
+  }, []);
 
-  // 의존성: 오직 id (문자열로 고정)
-  const stableId = useMemo(() => (typeof id === "string" ? id : id ? String(id) : ""), [id]);
-
+  // 초기화 + fetch
   useEffect(() => {
-    // id가 바뀌면 다음 요청을 허용하도록 리셋 (다른 페이지에서 재사용될 때 대비)
-    fetchedRef.current = false;
-    animatedRef.current = false;
-    cardY.setValue(16);
-    cardOpacity.setValue(0);
+    setIsPlaying(false);
+    setIsEnded(false);
+    setMediaDurationMs(0);
+    setVisibleLineCount(0);
+    Animated.timing(hintOpacity, { toValue: 0, duration: 0, useNativeDriver: true }).start();
+    sheetClose(false);
 
     if (stableId) fetchCard(stableId);
     else {
-      // id 없을 때도 로딩 종료 처리
       setLoading(false);
       setErr("잘못된 카드 주소입니다.");
     }
-  }, [stableId, fetchCard, cardY, cardOpacity]);
+  }, [stableId, fetchCard]);
 
-  const onShare = async () => {
-    if (!data?.shareUrl) {
-      Alert.alert("공유 불가", "공유 링크가 준비되지 않았습니다.");
-      return;
+  // (옵션) 오디오 길이 로딩
+  useEffect(() => {
+    let mounted = true;
+    const loadAudio = async () => {
+      if (!data?.audioUrl) return;
+      try {
+        const { sound, status } = await Audio.Sound.createAsync(
+          { uri: data.audioUrl },
+          { shouldPlay: false }
+        );
+        if (!mounted) {
+          sound.unloadAsync().catch(() => {});
+          return;
+        }
+        soundRef.current = sound;
+        if ("durationMillis" in status && typeof status.durationMillis === "number") {
+          setMediaDurationMs(status.durationMillis);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadAudio();
+    return () => {
+      mounted = false;
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
+    };
+  }, [data?.audioUrl]);
+
+  // Video status
+  const onStatusUpdate = (s: any) => {
+    if (!s) return;
+    if ((s as AVPlaybackStatusSuccess).isLoaded) {
+      const st = s as AVPlaybackStatusSuccess;
+      setIsPlaying(st.isPlaying);
+      setIsEnded(st.didJustFinish || false);
+      if (!data?.audioUrl && typeof st.durationMillis === "number") {
+        setMediaDurationMs(st.durationMillis);
+      }
+      if (st.didJustFinish) {
+        Animated.timing(hintOpacity, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+      }
     }
+  };
+
+  // 중앙 컨트롤 (탭: 재생/일시정지/리플레이, 롱탭: 정지)
+  const onPressControl = async () => {
     try {
-      await Share.share({ message: data.shareUrl });
+      if (!videoRef.current) return;
+      const status = await videoRef.current.getStatusAsync();
+      if (!("isLoaded" in status) || !status.isLoaded) return;
+
+      if (isEnded) {
+        await videoRef.current.replayAsync();
+        setIsEnded(false);
+        Animated.timing(hintOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+        return;
+      }
+      if (status.isPlaying) {
+        await videoRef.current.pauseAsync();
+        return;
+      }
+      await videoRef.current.playAsync();
+      Animated.timing(hintOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     } catch {
-      Alert.alert("공유 실패", "다시 시도해 주세요.");
+      Alert.alert("재생 오류", "영상을 재생할 수 없어요.");
     }
   };
 
-  const onCopy = async () => {
-    if (!data?.shareUrl) return;
-    await Clipboard.setStringAsync(data.shareUrl);
-    Alert.alert("복사됨", "공유 링크가 복사되었어요.");
+  const onLongPressControl = async () => {
+    try {
+      if (!videoRef.current) return;
+      const status = await videoRef.current.getStatusAsync();
+      if (!("isLoaded" in status) || !status.isLoaded) return;
+      await videoRef.current.setStatusAsync({ shouldPlay: false, positionMillis: 0 });
+      setIsEnded(false);
+      Animated.timing(hintOpacity, { toValue: 0, duration: 0, useNativeDriver: true }).start();
+    } catch {
+      // ignore
+    }
   };
 
-  const goPurchase = () => {
-    router.push({ pathname: "/checkout", params: { id: data?.id ?? stableId } });
+  // Sheet open/close
+  const sheetAnim = (open: boolean) =>
+    Animated.spring(sheetY, {
+      toValue: open ? 0 : SHEET_H - SHEET_PEEK,
+      bounciness: 6,
+      useNativeDriver: true,
+    });
+
+  const sheetOpenFn = (animate = true) => {
+    setSheetOpen(true);
+    (animate ? sheetAnim(true) : Animated.timing(sheetY, { toValue: 0, duration: 0, useNativeDriver: true })).start();
+    startReveal();
   };
+
+  const sheetClose = (animate = true) => {
+    setSheetOpen(false);
+    stopRevealTimers();
+    setVisibleLineCount(0);
+    (animate
+      ? sheetAnim(false)
+      : Animated.timing(sheetY, { toValue: SHEET_H - SHEET_PEEK, duration: 0, useNativeDriver: true })
+    ).start();
+  };
+
+  const onPressHint = () => sheetOpenFn();
+
+  // Letter reveal
+  const stopRevealTimers = () => {
+    revealTimers.current.forEach((t) => clearTimeout(t));
+    revealTimers.current = [];
+  };
+
+  const startReveal = () => {
+    stopRevealTimers();
+    setVisibleLineCount(0);
+    let totalMs = mediaDurationMs;
+    if (!totalMs || totalMs < 1000) totalMs = Math.max(4000, mediaDurationMs); // 최소 4초
+
+    const totalChars = lines.reduce((acc, l) => acc + Math.max(1, l.length), 0);
+    if (totalChars === 0) return;
+
+    let accMs = 0;
+    lines.forEach((line, idx) => {
+      const sliceMs = Math.round((Math.max(1, line.length) / totalChars) * totalMs);
+      accMs += sliceMs;
+      const timer = setTimeout(() => {
+        setVisibleLineCount((c) => Math.min(lines.length, Math.max(c, idx + 1)));
+        const anim = lineAnims.current[idx];
+        if (anim) {
+          Animated.parallel([
+            Animated.timing(anim.opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+            Animated.timing(anim.ty, { toValue: 0, duration: 280, useNativeDriver: true }),
+          ]).start();
+        }
+      }, accMs) as unknown as number;
+      revealTimers.current.push(timer);
+    });
+  };
+
+  // 로컬/원격 비디오 소스 계산
+  const coverUri =
+    data?.coverImageUrl ?? "https://via.placeholder.com/1200x1600.png?text=Poster";
+  const nameForCaption =
+    (to && String(to).trim()) || data?.recipientName || "";
+  const videoSource =
+    (data?.videoLocal as number | undefined) ??
+    (data?.videoUrl ? { uri: data.videoUrl } : undefined);
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>카드를 준비하고 있어요…</Text>
-        <View style={styles.skeletonCard} />
+      <View style={[styles.page, { justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ color: "#666" }}>카드를 준비하고 있어요…</Text>
       </View>
     );
   }
-
   if (err) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>{err}</Text>
-        <Pressable
-          style={[styles.btn, styles.btnPrimary]}
-          onPress={() => {
-            // 수동 재시도 시에도 중복 방지 ref 리셋
-            fetchedRef.current = false;
-            animatedRef.current = false;
-            cardY.setValue(16);
-            cardOpacity.setValue(0);
-            if (stableId) fetchCard(stableId);
-          }}
-        >
-          <Ionicons name="refresh" size={18} color="#fff" />
-          <Text style={styles.btnPrimaryText}>다시 시도</Text>
-        </Pressable>
+      <View style={[styles.page, { justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ color: "#b91c1c", textAlign: "center" }}>{err}</Text>
       </View>
     );
   }
-
   if (!data) return null;
 
-  const imgUri = useMemo(
-    () =>
-      data.bouquetGif ??
-      data.bouquetImageUrl ??
-      "https://via.placeholder.com/800x1200?text=Bouquet",
-    [data.bouquetGif, data.bouquetImageUrl]
-  );
-
   return (
-    <View style={styles.page}>
-      <View pointerEvents="none" style={styles.bgGradient} />
+    <View style={[styles.page, { paddingTop: Math.max(insets.top, 16) }]}>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
-        <Animated.View
-          style={[
-            styles.card,
-            { width: CARD_W, opacity: cardOpacity, transform: [{ translateY: cardY }] },
-          ]}
-        >
-          <View style={styles.cardTop}>
-            {data.badgeText ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeTextText}>{data.badgeText}</Text>
-              </View>
+      {/* 🔹 오른쪽 상단 '다음' 버튼 (아이콘 → 흰 글자) */}
+      <Pressable
+        style={[styles.nextBtn, { top: 8, right: 12 }]}
+        onPress={() =>
+          router.push({
+            pathname: "/paymentConfirm",
+            params: { id: stableId, to: nameForCaption },
+          })
+        }
+        accessibilityLabel="다음"
+      >
+        <Text style={styles.nextBtnText}>다음</Text>
+      </Pressable>
+
+      {/* ───────── 폴라로이드 카드 ───────── */}
+      <View style={styles.polaroidWrap}>
+        <View style={styles.polaroidInner}>
+          {/* 종이 질감 오버레이 */}
+          <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
+
+          {/* 사진(=영상) 영역 */}
+          <View style={styles.photoArea}>
+            {videoSource ? (
+              <Video
+                ref={videoRef}
+                source={videoSource as any}
+                style={styles.video}
+                resizeMode={ResizeMode.COVER}
+                onPlaybackStatusUpdate={onStatusUpdate}
+                shouldPlay={false}
+                isLooping={false}
+                useNativeControls={false}
+                usePoster={false}
+                posterSource={{ uri: coverUri }}
+                posterStyle={styles.video}
+              />
             ) : (
-              <View style={{ height: 22 }} />
+              <Image source={{ uri: coverUri }} style={styles.video} />
             )}
-            <Pressable style={styles.smallIconBtn} onPress={onCopy} accessibilityLabel="링크 복사">
-              <Ionicons name="link-outline" size={16} color="#6b7280" />
-            </Pressable>
-          </View>
 
-          <Image source={{ uri: imgUri }} style={styles.heroImage} resizeMode="cover" />
-
-          <View style={styles.divider} />
-
-          <View style={styles.textWrap}>
-            <Text
-              style={[
-                styles.letter,
-                Platform.OS === "web" && ({ whiteSpace: "pre-wrap" } as any),
-              ]}
+            {/* 중앙 컨트롤(탭=재생/일시정지/리플레이, 롱탭=정지) */}
+            <Pressable
+              onPress={onPressControl}
+              onLongPress={onLongPressControl}
+              delayLongPress={280}
+              style={styles.playHit}
+              accessibilityLabel={isEnded ? "다시 재생" : isPlaying ? "일시정지" : "재생"}
             >
-              {data.letter}
+              {!isPlaying && <View style={styles.playTriangle} />}
+            </Pressable>
+
+            {/* 영상 종료 후 배너 가이드 */}
+            <Animated.View
+              pointerEvents="box-none"
+              style={[styles.hintOverlay, { opacity: hintOpacity, bottom: 10 }]}
+            >
+              <Pressable onPress={onPressHint} style={styles.hintPill} accessibilityLabel="편지 보기">
+                <Text style={styles.hintText}>배너를 올려 편지 보기</Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+
+          {/* 폴라로이드 하단 넓은 영역: 날짜 + “사랑하는 00에게” */}
+          <View style={styles.bottomCaption}>
+            <Text style={styles.bottomCaptionText}>
+              {formatKoDate()} 사랑하는 {nameForCaption}선아에게
             </Text>
-
-            {!!data.bouquetTitle && (
-              <View style={styles.metaRow}>
-                <Ionicons name="flower" size={14} color="#7A958E" />
-                <Text style={styles.metaText}>{data.bouquetTitle}</Text>
-              </View>
-            )}
           </View>
 
-          <View style={styles.videoBlock}>
-            <Ionicons name="videocam-outline" size={16} color="#6b7280" />
-            <Text style={styles.videoText}>영상은 곧 준비됩니다.</Text>
-          </View>
-        </Animated.View>
-
-        <View style={[styles.noticeBox, { width: CARD_W }]}>
-          <Ionicons name="information-circle-outline" size={16} color="#6b7280" />
-          <Text style={styles.noticeText}>
-            화면에 보이는 꽃다발과 실제 꽃다발은 계절·공급 상황에 따라 일부 차이가 있을 수 있어요.
-          </Text>
+          {/* ▽ 모서리 테이프 4개 (찢어진 PNG) ▽ */}
+          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTL]} />
+          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTR]} />
+          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBL]} />
+          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBR]} />
         </View>
-      </ScrollView>
-
-      <View style={[styles.actionsBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <Pressable style={[styles.actionBtn, styles.actionGhost]} onPress={onShare}>
-          <Ionicons name="share-social-outline" size={18} />
-          <Text style={styles.actionGhostText}>링크 공유</Text>
-        </Pressable>
-
-        <Pressable style={[styles.actionBtn, styles.actionPrimary]} onPress={goPurchase}>
-          <Ionicons name="bag-handle" size={18} color="#fff" />
-          <Text style={styles.actionPrimaryText}>구매하러 가기</Text>
-        </Pressable>
       </View>
+
+      {/* ───────── 하단 배너(반투명 검정, 흰 굵은 글자) ───────── */}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            paddingBottom: Math.max(insets.bottom, 14),
+            transform: [{ translateY: sheetY }],
+          },
+        ]}
+      >
+        <Pressable
+          onPress={() => (sheetOpen ? sheetClose() : sheetOpenFn())}
+          style={styles.sheetHandle}
+          accessibilityLabel={sheetOpen ? "배너 닫기" : "배너 열기"}
+        >
+          <View style={styles.grabber} />
+        </Pressable>
+
+        <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
+          {lines.map((line, i) => {
+            const anim = lineAnims.current[i];
+            return (
+              <Animated.Text
+                key={i}
+                style={[
+                  styles.letterLine,
+                  { opacity: anim?.opacity ?? 0, transform: [{ translateY: anim?.ty ?? 8 }] },
+                ]}
+              >
+                {line === "" ? " " : line}
+              </Animated.Text>
+            );
+          })}
+        </View>
+      </Animated.View>
     </View>
   );
 }
 
-/* ---------------- Styles ---------------- */
+/* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
-  page: { flex: 1, alignItems: "center", backgroundColor: "#F5EFE3" },
-  bgGradient: {
-    position: "absolute", top: -120, width: "120%", height: 280, alignSelf: "center",
-    borderBottomLeftRadius: 240, borderBottomRightRadius: 240, backgroundColor: "#EBD7B2", opacity: 0.5,
+  page: { flex: 1, backgroundColor: PAGE_BG, alignItems: "center" },
+
+  // 오른쪽 상단 '다음' 버튼
+  nextBtn: {
+    position: "absolute",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    zIndex: 60,
+    elevation: 60,
   },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "#fff" },
-  loadingText: { marginTop: 12, color: "#666" },
-  skeletonCard: {
-    width: CARD_W, height: Math.round(CARD_W * 1.6), backgroundColor: "#f2f2f2",
-    borderRadius: CARD_RADIUS, marginTop: 16,
+  nextBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+
+  // Polaroid
+  polaroidWrap: {
+    width: CARD_W,
+    alignItems: "center",
+    paddingTop: 38,
   },
-  errorText: { color: "#b91c1c", textAlign: "center", marginBottom: 12 },
-  card: {
-    marginTop: 28, backgroundColor: "#fff", borderRadius: CARD_RADIUS, paddingBottom: 14,
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
-    elevation: 3, overflow: "hidden", alignItems: "center",
+  polaroidInner: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 6,
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.10,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
   },
-  cardTop: {
-    width: "100%", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6,
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+  paperGrain: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.16,
+    resizeMode: "repeat" as any,
+    pointerEvents: "none",
+    borderRadius: 6,
   },
-  badge: { backgroundColor: "#0a84ff", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  badgeTextText: { color: "#fff", fontWeight: "800", fontSize: 12 },
-  smallIconBtn: { backgroundColor: "#F3F4F6", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },
-  heroImage: { width: "88%", height: Math.round(CARD_W * 0.95), borderRadius: 18, backgroundColor: "#eaeaea" },
-  divider: { width: "92%", height: 1, backgroundColor: "#F0F2F5", marginTop: 14 },
-  textWrap: { width: "86%", marginTop: 14, alignItems: "center" },
-  letter: { fontSize: 16, lineHeight: 26, color: "#2b2b2b", textAlign: "center" },
-  metaRow: { marginTop: 10, flexDirection: "row", alignItems: "center", gap: 6 },
-  metaText: { fontSize: 12, color: "#5c6a68", fontWeight: "700" },
-  videoBlock: {
-    marginTop: 16, backgroundColor: "#F8FAFB", borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8,
+  photoArea: {
+    width: "100%",
+    height: PHOTO_H,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    position: "relative",
+    borderWidth: 1,
+    borderColor: "#FFF",
+    transform: [{ rotate: "-0.2deg" }],
   },
-  videoText: { color: "#6b7280", fontSize: 12 },
-  noticeBox: {
-    marginTop: 16, backgroundColor: "#ffffff", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10,
-    flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "center",
+  video: { width: "100%", height: "100%" },
+
+  // 중앙 컨트롤 히트 박스
+  playHit: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: 86,
+    height: 86,
+    marginLeft: -43,
+    marginTop: -43,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  noticeText: { color: "#4b5563", fontSize: 12, flexShrink: 1 },
-  actionsBar: {
-    position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingTop: 10,
-    backgroundColor: "rgba(255,255,255,0.96)", flexDirection: "row", gap: 10, justifyContent: "center",
-    alignItems: "center", borderTopLeftRadius: 16, borderTopRightRadius: 16,
+  // 회색 삼각형(재생)
+  playTriangle: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 20,
+    borderBottomWidth: 20,
+    borderLeftWidth: 32,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent",
+    borderLeftColor: "#9CA3AF",
+    marginLeft: 6,
   },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 999 },
-  actionPrimary: { backgroundColor: "#0a84ff" },
-  actionPrimaryText: { color: "#fff", fontWeight: "800" },
-  actionGhost: { backgroundColor: "#eef2ff" },
-  actionGhostText: { color: "#0a84ff", fontWeight: "800" },
-  btn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999 },
-  btnPrimary: { backgroundColor: "#7A958E" },
-  btnPrimaryText: { color: "#fff", fontWeight: "800" },
+
+  bottomCaption: {
+    marginTop: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  bottomCaptionText: {
+    fontSize: 14,
+    color: "#000",
+  },
+
+  // 모서리 테이프 4개 (찢어진 PNG)
+  cornerTape: {
+    position: "absolute",
+    width: 300, // 가로크기
+    height: 200, // 세로크기
+    resizeMode: "contain",
+    zIndex: 0,
+    opacity: 0.95,
+  },
+  tapeTL: { top: -60, left: -150, transform: [{ rotate: "-15deg" }] },
+  tapeTR: { top: -90, right: -120, transform: [{ rotate: "75deg" }] },
+  tapeBL: { bottom: -90, left: -150, transform: [{ rotate: "75deg" }] },
+  tapeBR: { bottom: -110, right: -135, transform: [{ rotate: "-15deg" }] },
+
+  // 힌트 pill (영상 종료 시)
+  hintOverlay: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  hintPill: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  hintText: { color: "#111827", fontWeight: "700", fontSize: 12 },
+
+  // 하단 배너
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: SHEET_H,
+    backgroundColor: "rgba(0,0,0,0.7)", // 반투명 검정
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: -8 },
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  sheetHandle: { alignItems: "center", paddingTop: 8, paddingBottom: 10 },
+  grabber: { width: 46, height: 5, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.7)" },
+
+  letterLine: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: "#fff",
+    fontWeight: "800",
+    marginBottom: 6,
+  },
 });

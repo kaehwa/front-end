@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   Image,
+  Image as RNImage,         // ← 로컬 자산 URL 변환용
   Pressable,
   Dimensions,
   RefreshControl,
@@ -13,7 +14,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
@@ -23,12 +24,12 @@ const CARD_H = Math.floor(CARD_W * 1.35);
 
 const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // TODO: 실제 주소로 교체
 
-const BG = "#FFF4DA";             // 메인과 동일한 크림색
+const BG = "#FFF4DA";
 const WHITE = "#FFFFFF";
 const BORDER = "rgba(0,0,0,0.06)";
 const TEXT = "#1F2937";
 const SUB = "#6b7280";
-const ACCENT = "#7A958E";         // 포인트 컬러 (버튼/배지)
+const ACCENT = "#7A958E";
 
 // --- Mascot & Local Images ---
 const DANBI = require("./../assets/mascot/danbi.jpg");
@@ -46,16 +47,17 @@ type LocalBouquetKey = keyof typeof LOCAL_BOUQUETS;
 type Bouquet = {
   id: string;
   title: string;
-  imageUrl?: string;              // 원격 이미지(선택)
-  imageLocal?: LocalBouquetKey;   // 로컬 이미지 키(선택) → 있으면 우선 사용
+  imageUrl?: string;
+  imageLocal?: LocalBouquetKey;
   price?: number;
   tags?: string[];
-  palette?: string[];             // 추천 색상 팔레트
+  palette?: string[];
   floristName?: string;
-  score?: number;                 // 0~1
+  score?: number;
 };
 
 export default function Recommendations() {
+  const router = useRouter();
   const params = useLocalSearchParams();
 
   // URL 파라미터 > 백엔드 응답 > 기본값
@@ -82,7 +84,6 @@ export default function Recommendations() {
   useEffect(() => {
     (async () => {
       try {
-        // 실제 API 예:
         // const res = await fetch(`${BACKEND_URL}/api/reco-meta`);
         // const remote = await res.json(); // { giver, receiver, occasion }
         const remote: Partial<typeof meta> = {}; // 데모
@@ -92,7 +93,7 @@ export default function Recommendations() {
           occasion: prev.occasion || remote.occasion || "특별한 날",
         }));
       } catch {
-        // 메타 호출 실패해도 무시(기본값/파라미터 사용)
+        // 무시
       }
     })();
   }, []);
@@ -101,18 +102,18 @@ export default function Recommendations() {
     setError(null);
     setLoading(true);
     try {
-      // 실제 API 예시:
       // const res = await fetch(
       //   `${BACKEND_URL}/api/recommendations?giver=${encodeURIComponent(meta.giver)}&receiver=${encodeURIComponent(meta.receiver)}&occasion=${encodeURIComponent(meta.occasion)}`
       // );
       // const data: Bouquet[] = await res.json();
 
-      // 데모/폴백 데이터 (4개 보장, 로컬 이미지 사용)
+      // 데모/폴백 데이터 (price 추가)
       const data: Bouquet[] = [
         {
           id: "r1",
           title: "라벤더 포에틱",
           imageLocal: "r1",
+          price: 68000,
           tags: ["은은함", "라벤더", "편안함"],
           palette: ["#b5a6d3", "#f6f2ff", "#7557a2"],
         },
@@ -120,6 +121,7 @@ export default function Recommendations() {
           id: "r2",
           title: "선셋 로즈믹스",
           imageLocal: "r2",
+          price: 72000,
           tags: ["축하", "장미", "따뜻함"],
           palette: ["#ffb4a2", "#ffd6a5", "#ffadad"],
         },
@@ -127,6 +129,7 @@ export default function Recommendations() {
           id: "r3",
           title: "포레스트 브리즈",
           imageLocal: "r3",
+          price: 59000,
           tags: ["그린", "싱그러움", "위로"],
           palette: ["#9dc9a5", "#e6f4ea", "#5f8f6b"],
         },
@@ -134,6 +137,7 @@ export default function Recommendations() {
           id: "r4",
           title: "아이보리 세레나데",
           imageLocal: "r4",
+          price: 64000,
           tags: ["감성", "미니멀", "우아"],
           palette: ["#f2efe9", "#e2dcd0", "#b3a893"],
         },
@@ -158,10 +162,27 @@ export default function Recommendations() {
     setRefreshing(false);
   }, [fetchRecommendations]);
 
+  // ✅ 카드 탭 → 결제(toss)로 바로 이동 + 이미지/이름/금액 전달
   const onPressCard = (item: Bouquet) => {
+    const orderId = `order_${Date.now()}_${item.id}`;
+    const amount = item.price ?? 0;
+    const orderName = item.title;
+
+    // 이미지 URL(로컬이면 resolveAssetSource로 변환)
+    const imgUri = item.imageLocal
+      ? RNImage.resolveAssetSource(LOCAL_BOUQUETS[item.imageLocal]).uri
+      : item.imageUrl || "";
+
     router.push({
-      pathname: "/confirm",
-      params: { id: item.id, title: item.title },
+      pathname: "/toss",
+      params: {
+        orderId,
+        amount: String(amount),
+        orderName,
+        image: encodeURIComponent(imgUri),        // 썸네일로 사용
+        successUrl: "gaehwa://payments/success", // 앱 복귀 스킴
+        failUrl: "gaehwa://payments/fail",
+      },
     });
   };
 
@@ -361,11 +382,10 @@ const styles = StyleSheet.create({
   danbiAvatar: {
     width: 55,
     height: 55,
-    
   },
   bubble: {
     flex: 1,
-    backgroundColor: WHITE, // 말풍선은 화이트 유지
+    backgroundColor: WHITE,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,

@@ -1,7 +1,7 @@
 // app/payments/toss.tsx
-// 필요 패키지 설치:  npx expo install react-native-webview
+// 필요 패키지: npx expo install react-native-webview
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,37 +10,52 @@ import {
   Pressable,
   Alert,
   Platform,
+  Image,
 } from "react-native";
 import { WebView } from "react-native-webview";
-// 타입은 내부 경로에서 import
 import type { WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 type Params = {
   orderId?: string;
-  amount?: string;       // "68000" 같은 문자열
-  orderName?: string;    // 주문명(상품명)
-  successUrl?: string;   // 예: gaehwa://payments/success
-  failUrl?: string;      // 예: gaehwa://payments/fail
+  amount?: string;       // "68000"
+  orderName?: string;    // 주문명
+  successUrl?: string;   // gaehwa://payments/success
+  failUrl?: string;      // gaehwa://payments/fail
+  image?: string;        // encodeURIComponent 된 이미지 URL (추천에서 전달)
 };
 
 export default function TossPayment() {
-  const { orderId, amount, orderName, successUrl, failUrl } =
+  const router = useRouter();
+  const { orderId, amount, orderName, successUrl, failUrl, image } =
     useLocalSearchParams<Params>();
 
-  // 필수 파라미터 검증 (서버에서 받은 값으로 들어오는 것이 일반적)
+  // 썸네일 렌더용: decode 해서 실제 표시
+  const imageUri = useMemo(() => {
+    if (!image) return "";
+    try { return decodeURIComponent(String(image)); }
+    catch { return String(image); }
+  }, [image]);
+
+  const priceNumber = useMemo(() => Number(amount ?? 0), [amount]);
+
+  // 필수 파라미터 검증
   const paramError = useMemo(() => {
-    if (!orderId) return "orderId가 없습니다.";
-    if (!amount) return "amount가 없습니다.";
-    if (!orderName) return "orderName이 없습니다.";
-    if (!successUrl) return "successUrl이 없습니다.";
-    if (!failUrl) return "failUrl이 없습니다.";
+    if (!orderId) return "orderId";
+    if (!amount) return "amount";
+    if (!orderName) return "orderName";
+    if (!successUrl) return "successUrl";
+    if (!failUrl) return "failUrl";
     return null;
   }, [orderId, amount, orderName, successUrl, failUrl]);
 
-  // 실제로는 백엔드가 사전서명/검증을 거친 결제 시작 URL을 내려주는 것이 안전합니다.
-  // 여기서는 데모용으로 백엔드 스타트 URL을 합성해 둡니다.
+  // ✅ 파라미터 오류면 화면 노출 없이 즉시 /checkout으로 이동
+  useEffect(() => {
+    if (paramError) router.replace("/checkout");
+  }, [paramError, router]);
+
+  // (정상 케이스) 결제 시작 URL — 서버에도 image 원본 파라미터 전달(인코딩 상태 그대로)
   const startUrl = useMemo(() => {
     const base = "https://your-backend.example.com/payments/toss/start";
     const q = new URLSearchParams({
@@ -49,29 +64,26 @@ export default function TossPayment() {
       orderName: orderName ?? "",
       successUrl: successUrl ?? "",
       failUrl: failUrl ?? "",
+      image: (image as string) ?? "", // 서버에서 decode 후 사용
     }).toString();
     return `${base}?${q}`;
-  }, [orderId, amount, orderName, successUrl, failUrl]);
+  }, [orderId, amount, orderName, successUrl, failUrl, image]);
 
-  // iOS/Android 모두에서 성공/실패 리다이렉트 감지
   const handleNav = (nav: WebViewNavigation) => {
     const url = nav.url || "";
-    if (url.startsWith(successUrl ?? "")) {
-      // 결제 성공 → 카드 화면으로 이동 (orderId로 식별)
+    if (successUrl && url.startsWith(successUrl)) {
       router.replace({ pathname: "/card", params: { id: orderId ?? "" } });
-    } else if (url.startsWith(failUrl ?? "")) {
-      // 결제 실패 → 체크아웃으로 복귀
+    } else if (failUrl && url.startsWith(failUrl)) {
       Alert.alert("결제 실패", "결제를 완료하지 못했습니다. 다시 시도해 주세요.");
       router.replace("/checkout");
     }
   };
 
-  // iOS에서는 딥링크/스킴 차단을 위해 shouldStart에서 먼저 필터링하면 더 안정적
   const shouldStart = (req: any) => {
     const url: string = req?.url ?? "";
     if (successUrl && url.startsWith(successUrl)) {
       router.replace({ pathname: "/card", params: { id: orderId ?? "" } });
-      return false; // WebView가 이 URL을 로드하지 않게 막음
+      return false;
     }
     if (failUrl && url.startsWith(failUrl)) {
       Alert.alert("결제 실패", "결제를 완료하지 못했습니다. 다시 시도해 주세요.");
@@ -81,29 +93,44 @@ export default function TossPayment() {
     return true;
   };
 
-  if (paramError) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>{paramError}</Text>
-        <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => router.replace("/checkout")}>
-          <Ionicons name="arrow-back" size={18} color="#fff" />
-          <Text style={styles.btnPrimaryText}>돌아가기</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  // ⚠️ paramError인 동안은 아무것도 렌더하지 않음(즉시 redirect)
+  if (paramError) return null;
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
-      {/* 상단 간단 헤더(선택) */}
+      {/* 상단 헤더 */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.headerBtn} accessibilityLabel="뒤로가기">
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.headerBtn}
+          accessibilityLabel="뒤로가기"
+        >
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text style={styles.headerTitle}>결제 진행</Text>
         <View style={{ width: 40 }} />
       </View>
 
+      {/* ░ 주문 요약 바: 추천에서 선택한 꽃다발 사진/이름/금액 표시 ░ */}
+      {(imageUri || orderName || amount) ? (
+        <View style={styles.summaryBar}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.thumb} />
+          ) : (
+            <View style={[styles.thumb, { backgroundColor: "#F3F4F6" }]} />
+          )}
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.prodTitle} numberOfLines={1}>
+              {orderName}
+            </Text>
+            <Text style={styles.prodPrice}>
+              {priceNumber.toLocaleString()}원
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* 결제 WebView */}
       <WebView
         source={{ uri: startUrl }}
         startInLoadingState
@@ -114,8 +141,8 @@ export default function TossPayment() {
           </View>
         )}
         onNavigationStateChange={handleNav}
-        // iOS에서 딥링크 차단/가로채기
         onShouldStartLoadWithRequest={Platform.OS === "ios" ? shouldStart : undefined}
+        style={{ flex: 1 }}
       />
     </View>
   );
@@ -130,6 +157,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#E5E7EB",
+    backgroundColor: "#fff",
   },
   headerBtn: {
     width: 40,
@@ -146,6 +174,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
+  /** 주문 요약 바 */
+  summaryBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#EFEFEF",
+    backgroundColor: "#fff",
+  },
+  thumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: "#EEE",
+  },
+  prodTitle: {
+    fontWeight: "800",
+    color: "#111827",
+  },
+  prodPrice: {
+    marginTop: 2,
+    color: "#6B7280",
+    fontSize: 12,
+  },
+
   center: {
     flex: 1,
     alignItems: "center",
@@ -154,8 +208,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   loadingText: { marginTop: 12, color: "#666" },
-  errorText: { color: "#b91c1c", textAlign: "center", marginBottom: 12 },
 
+  // (아래는 기존 스타일 유지)
+  errorText: { color: "#b91c1c", textAlign: "center", marginBottom: 12 },
   btn: {
     flexDirection: "row",
     alignItems: "center",

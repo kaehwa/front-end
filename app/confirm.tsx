@@ -31,11 +31,17 @@ const LOCAL_BOUQUETS = {
 
 type LocalKey = keyof typeof LOCAL_BOUQUETS;
 
+/** 원격/로컬 공용 데이터 타입 (imageUrl 제거) */
 type Data = {
   uri?: string;           // 원격일 때
   localKey?: LocalKey;    // 로컬일 때
   title?: string;
-  imageUrl: string;
+  palette?: string[];
+  floristName?: string;
+};
+
+type LocalMeta = {
+  title?: string;
   palette?: string[];
   floristName?: string;
 };
@@ -92,11 +98,12 @@ export default function ConfirmSelectedBouquet() {
   /** 로컬 더미 by id */
   const localFallbackFor = useCallback((id: string): Data => {
     const key: LocalKey = (["r1", "r2", "r3", "r4"].includes(id) ? id : "r1") as LocalKey;
-    const meta: Record<LocalKey, Omit<Data, "localKey">> = {
-      r1: { title: "라벤더 포에틱", palette: ["#b5a6d3","#f6f2ff","#7557a2"]  },
-      r2: { title: "선셋 로즈믹스", palette: ["#ffb4a2","#ffd6a5","#ffadad"]  },
-      r3: { title: "포레스트 브리즈", palette: ["#9dc9a5","#e6f4ea","#5f8f6b"]  },
-      r4: { title: "아이보리 세레나데", palette: ["#f2efe9","#e2dcd0","#b3a893"]  },
+
+    const meta: Record<LocalKey, LocalMeta> = {
+      r1: { title: "라벤더 포에틱",    palette: ["#b5a6d3", "#f6f2ff", "#7557a2"] },
+      r2: { title: "선셋 로즈믹스",    palette: ["#ffb4a2", "#ffd6a5", "#ffadad"] },
+      r3: { title: "포레스트 브리즈",  palette: ["#9dc9a5", "#e6f4ea", "#5f8f6b"] },
+      r4: { title: "아이보리 세레나데", palette: ["#f2efe9", "#e2dcd0", "#b3a893"] },
     };
     return { localKey: key, ...meta[key] };
   }, []);
@@ -132,9 +139,16 @@ export default function ConfirmSelectedBouquet() {
       //   2500
       // );
       // if (res.ok) {
-      //   const json = (await res.json()) as { gifUrl?: string; title?: string; palette?: string[]; floristName?: string; };
+      //   const json = (await res.json()) as {
+      //     gifUrl?: string; title?: string; palette?: string[]; floristName?: string;
+      //   };
       //   if (json.gifUrl && mountedRef.current) {
-      //     setData({ uri: json.gifUrl, title: json.title ?? local.title, palette: json.palette ?? local.palette, floristName: json.floristName ?? local.floristName });
+      //     setData({
+      //       uri: json.gifUrl,
+      //       title: json.title ?? local.title,
+      //       palette: json.palette ?? local.palette,
+      //       floristName: json.floristName ?? local.floristName,
+      //     });
       //   }
       // }
 
@@ -144,7 +158,6 @@ export default function ConfirmSelectedBouquet() {
     } finally {
       if (mountedRef.current) {
         setLoading(false);
-        // 약간의 프레임 뒤에 애니메이션
         requestAnimationFrame(runIntro);
       }
     }
@@ -183,7 +196,12 @@ export default function ConfirmSelectedBouquet() {
 
   if (!data) return null;
 
-  const source = data.localKey ? LOCAL_BOUQUETS[data.localKey] : { uri: data.uri! };
+  const source =
+    data.localKey
+      ? LOCAL_BOUQUETS[data.localKey]
+      : data.uri
+        ? { uri: data.uri }
+        : LOCAL_BOUQUETS.r1; // 최후 폴백
 
   return (
     <View style={styles.container}>
@@ -216,11 +234,13 @@ export default function ConfirmSelectedBouquet() {
             )}
           </View>
 
-          {data.palette?.length > 0 && (
+          {data.palette?.length ? (
             <View style={styles.paletteRow}>
-              {data.palette.slice(0, 5).map((c) => <View key={c} style={[styles.swatch, { backgroundColor: c }]} />)}
+              {data.palette.slice(0, 5).map((c) => (
+                <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
+              ))}
             </View>
-          )}
+          ) : null}
         </View>
 
         <View style={{ height: 140 }} />
@@ -231,7 +251,7 @@ export default function ConfirmSelectedBouquet() {
           style={[styles.cta, styles.ctaPrimary]}
           onPress={() => router.push({ pathname: "/letter", params: { id: stableId } })}
         >
-          <Ionicons name="bag-handle" size={18} color="#fff" />
+          <Ionicons name="checkmark" size={18} color="#fff" />
           <Text style={styles.ctaPrimaryText}>선택 완료</Text>
         </Pressable>
 

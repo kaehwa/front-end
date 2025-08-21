@@ -1,16 +1,15 @@
+// app/login.tsx
 import { useEffect, useState } from "react";
 import {
   Image, StyleSheet, Dimensions, ActivityIndicator,
-  Pressable, Text, View, ScrollView, Platform
+  Pressable, Text, View, Platform
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import { makeRedirectUri } from "expo-auth-session";
-import Constants from "expo-constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Crypto from "expo-crypto";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -27,66 +26,41 @@ const IOS_CLIENT_ID = "2775008760-83po6j3tmnjor9ttbnc8meg0me21haik.apps.googleus
 const WEB_CLIENT_ID = "2775008760-cu5dcieaua1pcl96ilfcg7p8egn4kqsg.apps.googleusercontent.com";
 const ANDROID_CLIENT_ID = "2775008760-dj5uto76ve22ja4v68lvslrk3vkl3dbl.apps.googleusercontent.com";
 
-interface GoogleCalendar {
-  id: string;
-  summary: string;
-  timeZone?: string;
-  [key: string]: any;
-}
-
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
-  const [userInfo, setUserInfo] = useState<any>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [calendars, setCalendars] = useState<GoogleCalendar[]>([]);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-      androidClientId: ANDROID_CLIENT_ID,
-      iosClientId: IOS_CLIENT_ID,
-      webClientId: WEB_CLIENT_ID,
-      scopes: ['https://www.googleapis.com/auth/calendar'],
-    });
-  
-    // 로그인 후 access token 저장
-    useEffect(() => {
-      if (response?.type === 'success') {
-        const { authentication } = response;
-        if (!authentication?.accessToken) return;
-        setAccessToken(authentication.accessToken);
-  
-        // 사용자 정보 가져오기
-        fetchUserInfo(authentication.accessToken);
-      }
-    }, [response]);
-  
-    const fetchUserInfo = async (token: string) => {
-      const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    androidClientId: ANDROID_CLIENT_ID,
+    iosClientId: IOS_CLIENT_ID,
+    webClientId: WEB_CLIENT_ID,
+    scopes: [
+      "openid",
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/calendar.readonly"
+    ],
+  });
+
+  // 로그인 후 access token 저장 + 다음 화면으로 이동
+  useEffect(() => {
+    (async () => {
+      if (response?.type !== "success") return;
+      const token = response.authentication?.accessToken;
+      if (!token) return;
+
+      // 사용자 정보 가져오기
+      const me = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setUserInfo(data);
-      console.log("User Set DONE")
-    };
+      }).then(r => r.json()).catch(() => null);
 
-  // 내 primary 캘린더의 이벤트 모두 가져오기
- const fetchMyEvents = async () => {
-    if (!accessToken) return;
-    const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const data = await res.json();
-    setCalendars(data.items || []);
-    console.log(data.items); // 여기 안에 내가 입력한 모든 일정이 들어있음
-    console.log("Load Calendar DONE")
-  };
+      await AsyncStorage.setItem("googleAccessToken", token);
+      if (me) await AsyncStorage.setItem("googleUser", JSON.stringify(me));
 
-
-  const handleSignOut = () => {
-    setUserInfo(null);
-    setCalendars([]);
-    setAccessToken(null);
-  }; 
+      // ✅ 로그인 화면에서는 끝. 캘린더 화면으로 네비게이트
+      router.replace("/calendar");
+    })();
+  }, [response]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -101,58 +75,32 @@ export default function LoginScreen() {
       </View>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        {!accessToken ? (
-          <Pressable
-            onPress={async () => {
-              if (!request) return;
-              setLoading(true);
+        <Pressable
+          onPress={async () => {
+            if (!request) return;
+            setLoading(true);
+            try {
               await promptAsync();
-            }}
-            disabled={!request || loading}
-            style={({ pressed }) => [
-              styles.googleBtn,
-              pressed && { transform: [{ scale: 0.99 }], opacity: 0.95 },
-              (!request || loading) && { opacity: 0.6 },
-            ]}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#4175DF" />
-            ) : (
-              <>
-                <Ionicons name="logo-google" size={20} color="#4175DF" style={{ marginRight: 10 }} />
-                <Text style={styles.googleText}>Google로 계속하기</Text>
-              </>
-            )}
-          </Pressable>
-        ) : (
-          <>
-            <Pressable
-              onPress={fetchMyEvents}
-              style={[styles.googleBtn, { marginBottom: 8 }]}
-            >
-              <Text style={styles.googleText}>캘린더 이벤트 불러오기</Text>
-            </Pressable>
-            <Pressable onPress={handleSignOut} style={styles.googleBtn}>
-              <Text style={styles.googleText}>로그아웃</Text>
-            </Pressable>
-          </>
-        )}
-
-        <ScrollView style={{ maxHeight: 300, marginTop: 10 }}>
-          {calendars.length === 0 ? (
-            <Text style={styles.text}>No calendars</Text>
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={!request || loading}
+          style={({ pressed }) => [
+            styles.googleBtn,
+            pressed && { transform: [{ scale: 0.99 }], opacity: 0.95 },
+            (!request || loading) && { opacity: 0.6 },
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#4175DF" />
           ) : (
-            (() => {
-              const lastCal = calendars[calendars.length - 1];
-              return (
-                <>
-                  <Text style={styles.text}>summary: {lastCal.summary || '(No summary)'}</Text>
-                  <Text style={styles.text}>description: {lastCal.description || '(No description)'}</Text>
-                </>
-              );
-            })()
+            <>
+              <Ionicons name="logo-google" size={20} color="#4175DF" style={{ marginRight: 10 }} />
+              <Text style={styles.googleText}>Google로 계속하기</Text>
+            </>
           )}
-        </ScrollView>
+        </Pressable>
       </View>
     </View>
   );
@@ -163,13 +111,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG, justifyContent: "space-between" },
   centerWrap: { alignItems: "center", paddingHorizontal: 24 },
   bubbleWrap: {
-    backgroundColor: WHITE,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    marginBottom: 12,
+    backgroundColor: WHITE, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: BORDER, marginBottom: 12,
   },
   bubbleText: { fontSize: 16, fontWeight: "700", color: TEXT },
   bubbleTail: {
@@ -178,7 +121,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER, transform: [{ rotate: "45deg" }],
   },
   danbi: { width: HERO_IMG_W, height: HERO_IMG_W * 1.05 },
-  subcopy: { marginTop: 10, fontSize: 13, color: SUB, textAlign: "center" },
+  subcopy: { marginTop: 1, fontSize: 13, color: SUB, textAlign: "center" },
   bottomBar: { paddingHorizontal: 20 },
   googleBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
@@ -186,5 +129,4 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(0,0,0,0.06)",
   },
   googleText: { fontSize: 16, fontWeight: "800", color: TEXT },
-  text: { fontSize: 16, marginVertical: 4 },
 });

@@ -17,7 +17,7 @@ const TEXT = "#1F2937";
 const SUB = "#6b7280";
 const ACCENT = "#FB7431";
 
-const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // 준비되면 교체
+const BACKEND_URL = "http://4.240.103.29:8080"; // 준비되면 교체
 
 /** ===== 로컬 더미 에셋 맵 =====
  *  프로젝트 경로에 맞게 이미지 파일만 넣어주면 바로 작동합니다.
@@ -49,6 +49,7 @@ type LocalMeta = {
 export default function ConfirmSelectedBouquet() {
   
   const params = useLocalSearchParams<{ id?: string }>();
+  const { orderID } = useLocalSearchParams<{ orderID: string }>();
   const stableId = useMemo(
     () => (typeof params.id === "string" ? params.id : params.id ? String(params.id) : ""),
     [params.id]
@@ -135,26 +136,20 @@ export default function ConfirmSelectedBouquet() {
     // 2) 백엔드가 준비되면 원격 교체(타임아웃 시 무시)
     try {
       // 실제 예시 (준비되면 주석 해제)
-      // const res = await fetchWithTimeout(
-      //   `${BACKEND_URL}/api/bouquets/${encodeURIComponent(id)}/gif`,
-      //   2500
-      // );
-      // if (res.ok) {
-      //   const json = (await res.json()) as {
-      //     gifUrl?: string; title?: string; palette?: string[]; floristName?: string;
-      //   };
-      //   if (json.gifUrl && mountedRef.current) {
-      //     setData({
-      //       uri: json.gifUrl,
-      //       title: json.title ?? local.title,
-      //       palette: json.palette ?? local.palette,
-      //       floristName: json.floristName ?? local.floristName,
-      //     });
-      //   }
-      // }
+      const res = await fetchWithTimeout(
+        `${BACKEND_URL}/flowers/${orderID}/message`,
+        2500
+      );
+   
+      const raw = await res.json();
+      // as {gifUrl?: string; title?: string; palette?: string[]; floristName?: string;};
+      console.log(raw);
+      
 
       // 데모: 원격 없이 로컬 유지
-    } catch {
+    } catch (e) {
+      console.log("error")
+      console.log(e)
       // 무시하고 로컬 유지
     } finally {
       if (mountedRef.current) {
@@ -250,7 +245,7 @@ export default function ConfirmSelectedBouquet() {
       <View style={[styles.actionsBar, { paddingBottom: 12 + insets.bottom }]}>
         <Pressable
           style={[styles.cta, styles.ctaPrimary]}
-          onPress={() => router.push({ pathname: "/letter", params: { id: stableId } })}
+          onPress={() => router.push({ pathname: "/letter", params: { id: stableId, orderID: orderID} })}
         >
           <Ionicons name="checkmark" size={18} color="#fff" />
           <Text style={styles.ctaPrimaryText}>선택 완료</Text>

@@ -17,7 +17,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
-const BACKEND_URL = "http://<YOUR_BACKEND_HOST>:<PORT>"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
 const MAX_LEN = 1000; // 글자 제한 (원하면 조정)
 
 type LetterResponse = {
@@ -28,6 +28,7 @@ type LetterResponse = {
 
 export default function LetterPage() {
   const { id, name } = useLocalSearchParams<{ id?: string; name?: string }>();
+  const { orderID } = useLocalSearchParams<{ orderID: string }>();
 
   // UI 상태
   const [loading, setLoading] = useState(true);
@@ -68,31 +69,34 @@ export default function LetterPage() {
     setLoadingSlow(false);
     try {
       // 실제 API 예시:
-      // const res = await fetch(`${BACKEND_URL}/api/letters/generate?id=${id ?? ""}`);
-      // if (!res.ok) throw new Error("Failed to fetch");
-      // const json: LetterResponse = await res.json();
+      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/message`);
+      const raw = await res.json();
+      
+      var letter = raw.recommendMessage
 
       // 데모 데이터 (백엔드 연동 전)
-      const json: LetterResponse = {
-        letter:
-          `${name ?? "사랑하는 사람"}에게,\n\n` +
-          `오늘은 우리 둘만의 세 번째 계절이 흐른 날이야., \n` +
-          `제주 바람에 실려 웃던 네 목소리, \n` +
-          `푸른 바다를 배경으로 마주 잡았던 손길이 아직도 내 마음을 따뜻하게 감싸고 있어. \n` +
+      // const json: LetterResponse = {
+      //   letter:
+      //     `${name ?? "사랑하는 사람"}에게,\n\n` +
+      //     `오늘은 우리 둘만의 세 번째 계절이 흐른 날이야., \n` +
+      //     `제주 바람에 실려 웃던 네 목소리, \n` +
+      //     `푸른 바다를 배경으로 마주 잡았던 손길이 아직도 내 마음을 따뜻하게 감싸고 있어. \n` +
 
-          `세 해 동안 함께한 순간들이 꽃잎처럼 차곡차곡 쌓여,이제는 하나의 큰 꽃다발이 되어 피어났네. \n` +
-          `그 안에는 우리의 웃음, 서로의 위로, 끝없는 사랑이 담겨 있어.\n\n` +
-          `이 특별한 날, 그 꽃다발을 지현 너에게 전하고 싶어. \n` +
-          `오늘도, 내일도, 그리고 앞으로의 모든 날도 함께 피어나고 싶어.. \n`+
-          `사랑해, 늘.\n\n`,
+      //     `세 해 동안 함께한 순간들이 꽃잎처럼 차곡차곡 쌓여,이제는 하나의 큰 꽃다발이 되어 피어났네. \n` +
+      //     `그 안에는 우리의 웃음, 서로의 위로, 끝없는 사랑이 담겨 있어.\n\n` +
+      //     `이 특별한 날, 그 꽃다발을 지현 너에게 전하고 싶어. \n` +
+      //     `오늘도, 내일도, 그리고 앞으로의 모든 날도 함께 피어나고 싶어.. \n`+
+      //     `사랑해, 늘.\n\n`,
           
-        recipient: name ?? "사랑하는 사람",
-        tone: "따뜻한 위로",
-      };
+      //   recipient: name ?? "사랑하는 사람",
+      //   tone: "따뜻한 위로",
+      // };
 
-      setServerLetter(json.letter);
-      setDraft(json.letter);
+      setServerLetter(letter);
+      setDraft(letter);
     } catch (e: any) {
+      console.log("error")
+      console.log(e)
       setError("편지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setLoading(false);
@@ -149,6 +153,25 @@ export default function LetterPage() {
       Alert.alert("저장 실패", "네트워크 상태를 확인하고 다시 시도해 주세요.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePress = async () => {
+    try {
+      // 1️⃣ POST 요청
+      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/message`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recommendMessage: serverLetter }),
+      });
+
+      const data = await res.json();
+      console.log("POST 결과:", data);
+
+      // 2️⃣ POST 완료 후 페이지 이동
+      router.push({ pathname: "/card", params: { id: orderID ?? "" } });
+    } catch (err) {
+      console.error("POST 실패:", err);
     }
   };
 
@@ -288,7 +311,7 @@ export default function LetterPage() {
         <View style={styles.footerCtas}>
           <Pressable
             style={[styles.btnWide, styles.btnPrimary]}
-            onPress={() => router.push({ pathname: "/card", params: { id: id ?? "" } })}
+            onPress={handlePress}
             accessibilityLabel="주문으로 이동"
           >
             <Ionicons name="mail-outline" size={18} color="#fff" />

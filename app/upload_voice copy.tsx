@@ -6,32 +6,31 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   Pressable,
   Platform,
   Modal,
-  Button,
 } from "react-native";
-import { router } from "expo-router";
-import { uploadImage } from "./uploads";
+import { router, useLocalSearchParams } from "expo-router";
+import Recording from "./audio"; 
 
 export default function ListeningMission() {
     /** 질문 & 플레이스홀더 */
     const QUESTIONS = [
-    "추억이 담긴 사진, 혹은 본인의 사진을 올려주세요!",
+    "더 의미 있는 추억을 위해 다음을 천천히 읽어주세요!",
     ];
 
     /** 상태 */
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showDoneModal, setShowDoneModal] = useState(false);
-    const [showNotModal, setShowNotModal] = useState(false);
-    const [block, setBlock] = useState(false);
+    const [showRecorder, setShowRecorder] = useState(false);
+    const { orderID } = useLocalSearchParams<{ orderID: string; }>();
+
 
     /** 서버 설정 */
     const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
-    const ID = 22
+    const ID = orderID
 
     /** 마스코트 이미지 + 애니메이션 */
     const expressions = [require("./../assets/mascot/danbi.jpg")];
@@ -75,38 +74,15 @@ export default function ListeningMission() {
     /** 현재 질문 */
     const currentQuestion = QUESTIONS[currentIndex]
 
-    /** 다음 버튼 핸들러 */
-    const handleOk = async () => {
-        changeExpression();
-    };
-
     /** 완료 팝업 */
     const handleModalOK = () => {
         setShowDoneModal(false);
-        router.push("/temp_a");
+        router.push({
+          pathname: "/recommendations",
+          params: { orderID: orderID },
+        });
     };
 
-    const handleModalNO = () => {
-        setShowNotModal(false);
-    };
-
-    const handleImageUpload = async () => {
-        try {
-            const result = await uploadImage(BACK_SWAGGER_URL, ID);
-
-            if (!result) {
-                console.log("not uploaded")
-                setShowNotModal(true)
-                return;
-            }
-
-            // 업로드 성공
-            setShowDoneModal(true); // 모달 열기
-        } catch (err) {
-            console.error(err);
-            alert("이미지 업로드 실패, 관리자에게 문의 바랍니다.");
-        }
-    };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -139,16 +115,20 @@ export default function ListeningMission() {
           resizeMode="contain"
         />
       </Animated.View>
-
+        
+        {/* <View style={styles.readingBound}>
+            <Text style={styles.readingText}>{readingScript}</Text>
+        </View> */}
       {/* 업로드 영역 */}
       <View style={styles.formArea}>
         <TouchableOpacity
           style={[
             styles.cta,
           ]}
-          onPress={handleImageUpload}
+          onPress={() => setShowRecorder(true)}
         >
-          <Text style={styles.ctaText}>사진 업로드</Text>
+          <Text style={styles.ctaText}>녹음하기</Text>
+          
         </TouchableOpacity>
       </View>
 
@@ -171,25 +151,15 @@ export default function ListeningMission() {
           </View>
         </View>
       </Modal>
-    {/* 업로드 안했을 때 */}
-    <Modal
-        visible={showNotModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowNotModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>업로드를 완료해 주세요!</Text>
-            {/* <Text style={styles.modalMsg}>
-              
-            </Text> */}
-            <Pressable style={styles.modalBtn} onPress={handleModalNO}>
-              <Text style={styles.modalBtnText}>OK</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+
+    <Modal visible={showRecorder} animationType="slide">
+        <Recording onClose={ (orderID) => {
+                  setShowRecorder(false);
+                  setShowDoneModal(true);
+                  console.log("저장된 URI:", orderID);
+            }}
+    />
+    </Modal>
     </SafeAreaView>
   );
 }
@@ -214,17 +184,17 @@ const styles = StyleSheet.create({
     ...Platform.select({ ios: { shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }, android: { elevation: 2 } }),
   },
   questionText: { fontSize: 16, lineHeight: 24, color: "#1F2937", textAlign: "center", letterSpacing: 0.1, fontWeight: "600" },
+  readingText: { fontSize: 10, lineHeight: 24, color: "#1F2937", textAlign: "left", letterSpacing: 0.1, fontWeight: "600" },
   tailTriWrap: { position: "absolute", bottom: -10, left: "50%", marginLeft: -10, width: 0, height: 0, pointerEvents: "none" },
   tailTriBorder: { borderLeftWidth: 10, borderRightWidth: 10, borderTopWidth: 12, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: BORDER },
   tailTriFill: { position: "absolute", top: -11, borderLeftWidth: 9, borderRightWidth: 9, borderTopWidth: 11, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: WHITE },
   mascotWrap: { width: 220, height: 250, alignItems: "center", justifyContent: "center" },
   mascot: { width: "100%", height: "100%" },
   formArea: { width: "50%", marginTop: 5 },
+  readingBound: { width: "50%", backgroundColor: WHITE, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 12, minHeight: 44, color: "#111", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   input: { backgroundColor: WHITE, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 12, minHeight: 44, fontSize: 15, color: "#111", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   cta: { flex: 1, backgroundColor: ORANGE, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 26, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  cta_2: { flex: 1, backgroundColor: BEIGE, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 26, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   ctaText: { color: WHITE, fontSize: 16, fontWeight: "700" },
-  ctaText_2: { color: ORANGE, fontSize: 16, fontWeight: "700" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center", padding: 24 },
   modalCard: { width: "100%", maxWidth: 360, backgroundColor: WHITE, borderRadius: 16, paddingVertical: 20, paddingHorizontal: 16, alignItems: "center", ...Platform.select({ ios: { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } }, android: { elevation: 6 } }) },
   modalTitle: { fontSize: 17, fontWeight: "700", color: "#111827", marginBottom: 8, textAlign: "center" },

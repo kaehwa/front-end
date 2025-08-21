@@ -654,7 +654,13 @@ const styles = StyleSheet.create({
     borderColor: "#FFF",
     transform: [{ rotate: "-0.2deg" }],
   },
-  video: { width: "100%", height: "100%" },
+  //video: {height: "100%"},//{ width: "", height: "100%", position: "relative"},
+  video: {
+    ...StyleSheet.absoluteFillObject, // 부모 영역 완전히 채움
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
 
   // 중앙 컨트롤 히트 박스
   playHit: {
@@ -693,7 +699,7 @@ const styles = StyleSheet.create({
 
   // 모서리 테이프 4개 (찢어진 PNG)
   cornerTape: {
-    position: "absolute",
+    position: "relative",
     width: 300, // 가로크기
     height: 200, // 세로크기
     resizeMode: "contain",

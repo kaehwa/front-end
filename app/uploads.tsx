@@ -39,7 +39,7 @@ export const uploadImage = async (baseUrl: string, id: string) => {  try {
         }
 
     // 4. 서버 업로드
-    const apiUrl = `${baseUrl}/flowers/${2}/image`;
+    const apiUrl = `${baseUrl}/flowers/${id}/image`;
     const response = await fetch(apiUrl, {
       method: "POST",
       body: formData,

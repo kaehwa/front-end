@@ -4,8 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Image,
-  Image as RNImage, // 로컬 자산 URL 변환
+  Image, //as Image, // 로컬 자산 URL 변환
   Pressable,
   Dimensions,
   RefreshControl,
@@ -16,8 +15,6 @@ import {
 import type { ImageSourcePropType } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Buffer } from "buffer";
-// import { resolveDiscoveryAsync } from "expo-auth-session";
 
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
@@ -27,7 +24,7 @@ const CARD_H = Math.floor(CARD_W * 1.35);
 
 // ── Config ────────────────────────────────────────────────────────
 const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
-const ID = "2"
+const ID = 22
 
 const BG = "#FFF4DA";
 const WHITE = "#FFFFFF";
@@ -78,6 +75,7 @@ type BackendReco = {
 export default function Recommendations() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { orderID } = useLocalSearchParams<{ orderID: string }>();
 
   // URL 파라미터 > 백엔드 응답 > 기본값
   const [meta, setMeta] = useState({
@@ -121,9 +119,11 @@ export default function Recommendations() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/flowers/${ID}/similar`);
+      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/bouquet-similar`);
       const raw: BackendReco[] = await res.json();
-
+      console.log(`${BACKEND_URL}/flowers/${ID}/similar`)
+      console.log("raw")
+      console.log(raw)
       const resData: Bouquet[] = raw.map((r: BackendReco) => ({
         id: String(r.id),
         title: r.name,
@@ -164,8 +164,8 @@ export default function Recommendations() {
     const orderName = item.title;
 
     // 이미지 URL(로컬이면 resolveAssetSource로 변환)
-    const imgUri = item.imageLocal
-      ? RNImage.resolveAssetSource(LOCAL_BOUQUETS[item.imageLocal]).uri
+    const imgUri = item.imageBase64
+      ? LOCAL_BOUQUETS.r1
       : item.imageUrl || "";
 
    
@@ -178,6 +178,7 @@ export default function Recommendations() {
       pathname: "/confirm",
       params: {
         id: String(item.id),
+        orderID : orderID,
         title: item.title ?? "",
         localKey: item.imageLocal ?? "",
         imageUrl: item.imageUrl ? encodeURIComponent(item.imageUrl) : "",

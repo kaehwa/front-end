@@ -18,7 +18,6 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Buffer } from "buffer";
 // import { resolveDiscoveryAsync } from "expo-auth-session";
 
-
 const { width } = Dimensions.get("window");
 const H_PADDING = 16;
 const GAP = 12;
@@ -159,6 +158,12 @@ export default function Recommendations() {
       ? RNImage.resolveAssetSource(LOCAL_BOUQUETS[item.imageLocal]).uri
       : item.imageUrl || "";
 
+   
+    // router.push({
+    //   pathname: "/confirm",
+    //   params: { id: item.id, title: item.title },
+    // });
+  
     router.push({
       pathname: "/confirm",
       params: {

@@ -291,17 +291,8 @@ export default function LetterPage() {
             onPress={() => router.push({ pathname: "/card", params: { id: id ?? "" } })}
             accessibilityLabel="주문으로 이동"
           >
-            <Ionicons name="bag-handle" size={18} color="#fff" />
-            <Text style={styles.btnPrimaryText}>이 편지와 함께 주문하기</Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.btnWide, styles.btnGhost]}
-            onPress={() => router.replace("/recommendations")}
-            accessibilityLabel="다른 추천 보러가기"
-          >
-            <Ionicons name="albums-outline" size={18} color="#FB7431" />
-            <Text style={styles.btnGhostText}>다른 추천 보기</Text>
+            <Ionicons name="mail-outline" size={18} color="#fff" />
+            <Text style={styles.btnPrimaryText}>이 편지와 함께 카드 만들기</Text>
           </Pressable>
         </View>
       </ScrollView>

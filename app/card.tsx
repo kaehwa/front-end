@@ -9,6 +9,7 @@ import {
   Animated,
   Alert,
   Image,
+  Easing,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -48,6 +49,153 @@ function formatKoDate(d = new Date()) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}.${mm}.${dd}.`;
+}
+
+/** --------------------------------------------------------
+ *  ✉️ 인트로: 봉투 열림 → 접힌 카드 상승 → 펼침
+ *  (이미지 없이 View만으로 구성 / PNG 교체 용이)
+ * -------------------------------------------------------- */
+function EnvelopeIntro({
+  onDone,
+}: {
+  onDone: () => void;
+}) {
+  const envW = Math.min(340, width * 0.82);
+  const envH = Math.min(220, Math.max(180, Math.round(envW * 0.62)));
+  const flapH = Math.round(envH * 0.38);
+  const cardW = Math.min(CARD_W, envW - 24);
+  const cardH = Math.min(260, Math.round(cardW * 0.72));
+
+  // 애니메이션 값
+  const flapRotX = useRef(new Animated.Value(0)).current;          // 0 → -150deg
+  const cardRiseY = useRef(new Animated.Value(40)).current;        // 40 → -16
+  const cardScaleY = useRef(new Animated.Value(0.5)).current;      // 0.5 → 1 (펼침)
+  const overlayOpacity = useRef(new Animated.Value(1)).current;    // 1 → 0 (사라짐)
+
+  useEffect(() => {
+    // 시퀀스: 플랩 열림 → 카드 상승/펼침 → 인트로 페이드아웃 → 완료 콜백
+    const openFlap = Animated.timing(flapRotX, {
+      toValue: 1,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    const rise = Animated.timing(cardRiseY, {
+      toValue: -16,
+      duration: 600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    const unfold = Animated.spring(cardScaleY, {
+      toValue: 1,
+      bounciness: 6,
+      speed: 10,
+      useNativeDriver: true,
+    });
+
+    const fadeOut = Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 380,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    // 플랩이 30%쯤 열렸을 때 카드가 올라오는 느낌으로 살짝 오버랩
+    Animated.sequence([
+      openFlap,
+      Animated.parallel([rise, unfold]),
+      fadeOut,
+    ]).start(() => {
+      onDone();
+    });
+  }, [flapRotX, cardRiseY, cardScaleY, overlayOpacity, onDone]);
+
+  // rotateX 보정: 중앙 회전이라 상단 경첩처럼 보이도록 pre/post translate
+  const flapPivotTranslate = flapH / 2;
+
+  // flapRotX(0~1) → deg 맵핑
+  const flapDeg = flapRotX.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "-150deg"],
+  });
+
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: "center", alignItems: "center", backgroundColor: PAGE_BG, opacity: overlayOpacity, zIndex: 999 }]}>
+      {/* 봉투 컨테이너 */}
+      <View style={{ width: envW, height: envH, position: "relative" }}>
+        {/* 봉투 바디 */}
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: flapH * 0.5,
+            backgroundColor: "#FFF1D6",
+            borderWidth: 1,
+            borderColor: "#E6D3AE",
+            borderBottomLeftRadius: 12,
+            borderBottomRightRadius: 12,
+          }}
+        />
+        {/* 봉투 윗면(플랩) */}
+        <Animated.View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: flapH,
+            backgroundColor: "#FFE7BD",
+            borderWidth: 1,
+            borderColor: "#E6D3AE",
+            borderTopLeftRadius: 12,
+            borderTopRightRadius: 12,
+            transform: [
+              { perspective: 800 },
+              { translateY: flapPivotTranslate * 1 },
+              { rotateX: flapDeg },
+              { translateY: -flapPivotTranslate * 1 },
+            ],
+          }}
+        />
+
+        {/* 접힌 카드 (봉투에서 올라옴) */}
+        <Animated.View
+          style={{
+            position: "absolute",
+            left: (envW - cardW) / 2,
+            bottom: Math.max(8, envH * 0.18),
+            width: cardW,
+            height: cardH,
+            backgroundColor: "#FFFFFF",
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+            shadowColor: "#000",
+            shadowOpacity: 0.18,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 6 },
+            transform: [
+              { translateY: cardRiseY },
+              // top-edge에서 펼쳐지는 느낌
+              { translateY: cardH * -0.5 },
+              { scaleY: cardScaleY },
+              { translateY: cardH * 0.5 },
+            ],
+            overflow: "hidden",
+          }}
+        >
+          {/* 접힌 티를 내기 위해 상/하 구분된 톤 */}
+          <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />
+          <View style={{ height: 1, backgroundColor: "#F0F2F5" }} />
+          <View style={{ flex: 1, backgroundColor: "#FAFAFA" }} />
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
 }
 
 // ── 컴포넌트 ────────────────────────────────────────────────────────────────
@@ -99,6 +247,10 @@ export default function CardScreen() {
   const stableId = typeof id === "string" ? id : id ? String(id) : "";
   const fetchedRef = useRef(false);
 
+  // 🔸 인트로 제어
+  const [showIntro, setShowIntro] = useState(true);
+  const mainOpacity = useRef(new Animated.Value(0)).current;
+
   // ── Fetch (데모 데이터) ───────────────────────────────────────────────────
   const fetchCard = useCallback(async (cardId: string) => {
     if (!cardId || fetchedRef.current) return;
@@ -106,9 +258,6 @@ export default function CardScreen() {
     setErr(null);
     setLoading(true);
     try {
-      // 실제 API 사용 시: videoLocal 대신 videoUrl을 내려주면 됩니다.
-
-      // ✅ 데모: 로컬 비디오 사용
       const json: CardPayload = {
         id: String(cardId),
         letter:
@@ -300,6 +449,17 @@ export default function CardScreen() {
     (data?.videoLocal as number | undefined) ??
     (data?.videoUrl ? { uri: data.videoUrl } : undefined);
 
+  // 🔸 인트로 종료 → 메인 페이드인
+  const handleIntroDone = useCallback(() => {
+    setShowIntro(false);
+    Animated.timing(mainOpacity, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [mainOpacity]);
+
   if (loading) {
     return (
       <View style={[styles.page, { justifyContent: "center", alignItems: "center" }]}>
@@ -318,118 +478,122 @@ export default function CardScreen() {
 
   return (
     <View style={[styles.page, { paddingTop: Math.max(insets.top, 16) }]}>
+      {/* ✉️ 인트로 오버레이 */}
+      {showIntro && <EnvelopeIntro onDone={handleIntroDone} />}
 
-      {/* 🔹 오른쪽 상단 '다음' 버튼 (아이콘 → 흰 글자) */}
-      <Pressable
-        style={[styles.nextBtn, { top: 8, right: 12 }]}
-        onPress={() =>
-          router.push({
-            pathname: "/paymentConfirm",
-            params: { id: stableId, to: nameForCaption },
-          })
-        }
-        accessibilityLabel="다음"
-      >
-        <Text style={styles.nextBtnText}>다음</Text>
-      </Pressable>
-
-      {/* ───────── 폴라로이드 카드 ───────── */}
-      <View style={styles.polaroidWrap}>
-        <View style={styles.polaroidInner}>
-          {/* 종이 질감 오버레이 */}
-          <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
-
-          {/* 사진(=영상) 영역 */}
-          <View style={styles.photoArea}>
-            {videoSource ? (
-              <Video
-                ref={videoRef}
-                source={videoSource as any}
-                style={styles.video}
-                resizeMode={ResizeMode.COVER}
-                onPlaybackStatusUpdate={onStatusUpdate}
-                shouldPlay={false}
-                isLooping={false}
-                useNativeControls={false}
-                usePoster={false}
-                posterSource={{ uri: coverUri }}
-                posterStyle={styles.video}
-              />
-            ) : (
-              <Image source={{ uri: coverUri }} style={styles.video} />
-            )}
-
-            {/* 중앙 컨트롤(탭=재생/일시정지/리플레이, 롱탭=정지) */}
-            <Pressable
-              onPress={onPressControl}
-              onLongPress={onLongPressControl}
-              delayLongPress={280}
-              style={styles.playHit}
-              accessibilityLabel={isEnded ? "다시 재생" : isPlaying ? "일시정지" : "재생"}
-            >
-              {!isPlaying && <View style={styles.playTriangle} />}
-            </Pressable>
-
-            {/* 영상 종료 후 배너 가이드 */}
-            <Animated.View
-              pointerEvents="box-none"
-              style={[styles.hintOverlay, { opacity: hintOpacity, bottom: 10 }]}
-            >
-              <Pressable onPress={onPressHint} style={styles.hintPill} accessibilityLabel="편지 보기">
-                <Text style={styles.hintText}>배너를 올려 편지 보기</Text>
-              </Pressable>
-            </Animated.View>
-          </View>
-
-          {/* 폴라로이드 하단 넓은 영역: 날짜 + “사랑하는 00에게” */}
-          <View style={styles.bottomCaption}>
-            <Text style={styles.bottomCaptionText}>
-              {formatKoDate()} 사랑하는 {nameForCaption}선아에게
-            </Text>
-          </View>
-
-          {/* ▽ 모서리 테이프 4개 (찢어진 PNG) ▽ */}
-          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTL]} />
-          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTR]} />
-          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBL]} />
-          <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBR]} />
-        </View>
-      </View>
-
-      {/* ───────── 하단 배너(반투명 검정, 흰 굵은 글자) ───────── */}
-      <Animated.View
-        style={[
-          styles.sheet,
-          {
-            paddingBottom: Math.max(insets.bottom, 14),
-            transform: [{ translateY: sheetY }],
-          },
-        ]}
-      >
+      <Animated.View style={{ flex: 1, width: "100%", alignItems: "center", opacity: mainOpacity }}>
+        {/* 🔹 오른쪽 상단 '다음' 버튼 (아이콘 → 흰 글자) */}
         <Pressable
-          onPress={() => (sheetOpen ? sheetClose() : sheetOpenFn())}
-          style={styles.sheetHandle}
-          accessibilityLabel={sheetOpen ? "배너 닫기" : "배너 열기"}
+          style={[styles.nextBtn, { top: 8, right: 12 }]}
+          onPress={() =>
+            router.push({
+              pathname: "/paymentConfirm",
+              params: { id: stableId, to: nameForCaption },
+            })
+          }
+          accessibilityLabel="다음"
         >
-          <View style={styles.grabber} />
+          <Text style={styles.nextBtnText}>다음</Text>
         </Pressable>
 
-        <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
-          {lines.map((line, i) => {
-            const anim = lineAnims.current[i];
-            return (
-              <Animated.Text
-                key={i}
-                style={[
-                  styles.letterLine,
-                  { opacity: anim?.opacity ?? 0, transform: [{ translateY: anim?.ty ?? 8 }] },
-                ]}
+        {/* ───────── 폴라로이드 카드 ───────── */}
+        <View style={styles.polaroidWrap}>
+          <View style={styles.polaroidInner}>
+            {/* 종이 질감 오버레이 */}
+            <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
+
+            {/* 사진(=영상) 영역 */}
+            <View style={styles.photoArea}>
+              {videoSource ? (
+                <Video
+                  ref={videoRef}
+                  source={videoSource as any}
+                  style={styles.video}
+                  resizeMode={ResizeMode.COVER}
+                  onPlaybackStatusUpdate={onStatusUpdate}
+                  shouldPlay={false}
+                  isLooping={false}
+                  useNativeControls={false}
+                  usePoster={false}
+                  posterSource={{ uri: coverUri }}
+                  posterStyle={styles.video}
+                />
+              ) : (
+                <Image source={{ uri: coverUri }} style={styles.video} />
+              )}
+
+              {/* 중앙 컨트롤 */}
+              <Pressable
+                onPress={onPressControl}
+                onLongPress={onLongPressControl}
+                delayLongPress={280}
+                style={styles.playHit}
+                accessibilityLabel={isEnded ? "다시 재생" : isPlaying ? "일시정지" : "재생"}
               >
-                {line === "" ? " " : line}
-              </Animated.Text>
-            );
-          })}
+                {!isPlaying && <View style={styles.playTriangle} />}
+              </Pressable>
+
+              {/* 영상 종료 후 배너 가이드 */}
+              <Animated.View
+                pointerEvents="box-none"
+                style={[styles.hintOverlay, { opacity: hintOpacity, bottom: 10 }]}
+              >
+                <Pressable onPress={onPressHint} style={styles.hintPill} accessibilityLabel="편지 보기">
+                  <Text style={styles.hintText}>배너를 올려 편지 보기</Text>
+                </Pressable>
+              </Animated.View>
+            </View>
+
+            {/* 폴라로이드 하단 넓은 영역: 날짜 + “사랑하는 00에게” */}
+            <View style={styles.bottomCaption}>
+              <Text style={styles.bottomCaptionText}>
+                {formatKoDate()} 사랑하는 {nameForCaption}선아에게
+              </Text>
+            </View>
+
+            {/* ▽ 모서리 테이프 4개 (찢어진 PNG) ▽ */}
+            <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTL]} />
+            <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTR]} />
+            <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBL]} />
+            <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBR]} />
+          </View>
         </View>
+
+        {/* ───────── 하단 배너 ───────── */}
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: Math.max(insets.bottom, 14),
+              transform: [{ translateY: sheetY }],
+            },
+          ]}
+        >
+          <Pressable
+            onPress={() => (sheetOpen ? sheetClose() : sheetOpenFn())}
+            style={styles.sheetHandle}
+            accessibilityLabel={sheetOpen ? "배너 닫기" : "배너 열기"}
+          >
+            <View style={styles.grabber} />
+          </Pressable>
+
+          <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
+            {lines.map((line, i) => {
+              const anim = lineAnims.current[i];
+              return (
+                <Animated.Text
+                  key={i}
+                  style={[
+                    styles.letterLine,
+                    { opacity: anim?.opacity ?? 0, transform: [{ translateY: anim?.ty ?? 8 }] },
+                  ]}
+                >
+                  {line === "" ? " " : line}
+                </Animated.Text>
+              );
+            })}
+          </View>
+        </Animated.View>
       </Animated.View>
     </View>
   );

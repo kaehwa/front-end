@@ -94,7 +94,7 @@ export default function OnboardingChat() {
 
       <Pressable
         style={styles.nextButton}
-        onPress={() => router.push("/main")}
+        onPress={() => router.push("/login")}
       >
         <Text style={styles.nextButtonText}>다음</Text>
       </Pressable>

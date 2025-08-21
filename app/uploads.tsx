@@ -16,10 +16,11 @@ export const uploadImage = async (baseUrl: string, id: string) => {  try {
 
     // 2. 이미지 선택
     const imageResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // 최신 Expo ImagePicker 기준
       quality: 1,
     });
-    if (imageResult.canceled) throw new Error("이미지 선택 취소");
+
+    if (imageResult.canceled) return false //throw new Error("이미지 선택 취소");
 
     console.log(imageResult)
     const imageUri = imageResult.assets[0].uri;
@@ -48,7 +49,10 @@ export const uploadImage = async (baseUrl: string, id: string) => {  try {
     console.log("image uploaded sucessfully")
     return await response.json();
   } catch (err) {
-    throw err;
+    console.log("catch error")
+    console.log(err)
+    return false
+    //throw err;
   }
 };
 
@@ -68,7 +72,7 @@ export const uploadAudio = async (baseUrl: string, id: string) => {
       copyToCacheDirectory: true,
     });
     console.log(audioResult)
-    if (audioResult.canceled) throw new Error("오디오 선택 취소");
+    if (audioResult.canceled) return false//throw new Error("오디오 선택 취소");
 
     const audioUri = audioResult.assets[0].uri;
 
@@ -87,6 +91,7 @@ export const uploadAudio = async (baseUrl: string, id: string) => {
     console.log("voice uploaded sucessfully")
     return await response.json();
   } catch (err) {
-    throw err;
+    return false
+    // throw err;
   }
 };

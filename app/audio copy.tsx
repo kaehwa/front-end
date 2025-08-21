@@ -1,9 +1,10 @@
+// RecordingPopup.tsx
 import React, { useState, useEffect } from "react";
 import { View, Button, Text, StyleSheet, Platform, Alert } from "react-native";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 
-export default function App() {
+export default function Recording({ onClose }: { onClose: () => void }) {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -21,9 +22,7 @@ export default function App() {
 
   const startRecording = async () => {
     setIsRecording(true);
-
     if (Platform.OS === "web") {
-      // 웹 녹음
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks: BlobPart[] = [];
@@ -32,7 +31,6 @@ export default function App() {
       setMediaRecorder(recorder);
       setWebAudioChunks(chunks);
     } else {
-      // 모바일 녹음
       const newRecording = new Audio.Recording();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       await newRecording.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
@@ -43,7 +41,6 @@ export default function App() {
 
   const stopRecording = async () => {
     setIsRecording(false);
-
     if (Platform.OS === "web") {
       if (!mediaRecorder) return;
       mediaRecorder.onstop = () => {
@@ -63,9 +60,7 @@ export default function App() {
 
   const saveRecording = async () => {
     if (!recordedUri) return;
-
     if (Platform.OS === "web") {
-      // 웹: 이미 URL 객체가 있으므로 다운로드
       const link = document.createElement("a");
       link.href = recordedUri;
       link.download = `recording_${Date.now()}.wav`;
@@ -74,7 +69,6 @@ export default function App() {
       document.body.removeChild(link);
       URL.revokeObjectURL(recordedUri);
     } else {
-      // 모바일: base64 읽고 파일 저장
       const base64Data = await FileSystem.readAsStringAsync(recordedUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
@@ -84,6 +78,7 @@ export default function App() {
       });
       Alert.alert("저장 완료", `경로: ${path}`);
     }
+    onClose(); // 녹음 종료 시 Modal 닫기
   };
 
   return (
@@ -102,3 +97,5 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
 });
+
+

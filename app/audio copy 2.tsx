@@ -11,17 +11,6 @@ export default function Recording({ onClose }: { onClose: () => void }) {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [webAudioChunks, setWebAudioChunks] = useState<BlobPart[]>([]);
 
-  const readingScript = `가파른 언덕 위, 바람이 흘러 나무 사이로 졸졸 흐르는 시냇물
-    호랑이 울음, 기러기 날갯짓, 차가운 달빛 아래, 숨죽인 별빛
-
-    희미한 그림자 속, 책과 연필, 종이 위,
-    조용히 떠오르는 이야기
-    자, 꿈틀대는 마음을 따라
-    하늘과 땅, 구름과 바람, 모든 소리가 춤춘다
-
-    펼쳐진 세상 속, 기억과 환상, 웃음과 눈물
-    잊지 못할 순간을 담아 오늘도 나는 걸어간다`
-
   useEffect(() => {
     (async () => {
       if (Platform.OS !== "web") {
@@ -101,7 +90,6 @@ export default function Recording({ onClose }: { onClose: () => void }) {
     } else if (status === "done") {
       saveRecording()
       onClose(); // 완료 상태에서 닫기
-      return true
     }
   };
 
@@ -115,16 +103,12 @@ export default function Recording({ onClose }: { onClose: () => void }) {
   const getBtnLabel = () => {
     if (status === "idle") return "시작";
     if (status === "recording") return "그만하기";
-    if (status === "done") return "저장하기";
+    if (status === "done") return "닫기";
     return "버튼";
   };
 
   return (
     <View style={styles.modalOverlay}>
-      <View style={styles.readingBound}>
-          <Text style={styles.modalTitle}> 다음을 천천히 읽어주세요. </Text>
-          <Text style={styles.readingText}>{readingScript}</Text>
-      </View>
       <View style={styles.modalCard}>
         <Text style={styles.modalTitle}>{getTitle()}</Text>
         <Pressable style={styles.modalBtn} onPress={handlePress}>
@@ -143,15 +127,14 @@ const WHITE = "#FFFFFF";
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: BG, //"rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
   },
   modalCard: {
-    width: "50%",
-    marginTop: 30,
-    //maxWidth: 360,
+    width: "100%",
+    maxWidth: 360,
     backgroundColor: WHITE,
     borderRadius: 16,
     paddingVertical: 20,
@@ -163,21 +146,19 @@ const styles = StyleSheet.create({
     }),
   },
   modalTitle: {
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: "700",
     color: "#111827",
     marginBottom: 16,
     textAlign: "center",
   },
   modalBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 12,
     backgroundColor: ORANGE,
     minWidth: 120,
     alignItems: "center",
   },
   modalBtnText: { color: WHITE, fontSize: 16, fontWeight: "700" },
-  readingBound: { width: "70%", backgroundColor: WHITE, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 12, minHeight: 44, color: "#111", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-  readingText: { fontSize: 10, lineHeight: 24, color: "#1F2937", textAlign: "left", letterSpacing: 0.1, fontWeight: "600" },
 });

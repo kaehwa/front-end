@@ -47,6 +47,7 @@ type LocalMeta = {
 };
 
 export default function ConfirmSelectedBouquet() {
+  
   const params = useLocalSearchParams<{ id?: string }>();
   const stableId = useMemo(
     () => (typeof params.id === "string" ? params.id : params.id ? String(params.id) : ""),

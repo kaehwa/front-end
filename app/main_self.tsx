@@ -16,6 +16,7 @@ import {
 import { router } from "expo-router";
 
 export default function ListeningMission() {
+  console.log("[RENDER] main_self")
   /** 질문 & 플레이스홀더 */
   const QUESTIONS = [
     "꽃으로 마음을 담아 전한다면,\n꽃을 건네실 분은 누구일까요?",
@@ -132,7 +133,7 @@ export default function ListeningMission() {
   /** 완료 팝업 */
   const handleModalOK = () => {
     setShowDoneModal(false);
-    router.push("/temp_i");
+    router.push("/recommendations");
   };
 
   /** UI */
@@ -203,9 +204,9 @@ export default function ListeningMission() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>거의 다 왔어요!</Text>
+            <Text style={styles.modalTitle}>입력이 모두 완료되었습니다!</Text>
             <Text style={styles.modalMsg}>
-              더 따듯하게 만들기 위해 사진과 음성을 올려주시겠어요?
+              입력 내용을 바탕으로 추천 꽃다발 리스트를 생성할게요.
             </Text>
             <Pressable style={styles.modalBtn} onPress={handleModalOK}>
               <Text style={styles.modalBtnText}>OK</Text>

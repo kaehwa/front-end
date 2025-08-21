@@ -26,7 +26,7 @@ const CARD_W = Math.floor((width - H_PADDING * 2 - GAP) / 2);
 const CARD_H = Math.floor(CARD_W * 1.35);
 
 const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
-const ID = "24"
+const ID = "2"
 
 const BG = "#FFF4DA";
 const WHITE = "#FFFFFF";
@@ -160,7 +160,7 @@ export default function Recommendations() {
       : item.imageUrl || "";
 
     router.push({
-      pathname: "/toss",
+      pathname: "/confirm",
       params: {
         orderId,
         amount: String(amount),
@@ -270,12 +270,7 @@ function Card({
   onToggleLike: () => void;
   scale: Animated.Value;
 }) {
-  // const imgSource =
-  //   item.imageLocal
-  //     ? LOCAL_BOUQUETS[item.imageLocal]
-  //     : item.imageUrl
-  //     ? { uri: item.imageUrl }
-  //     : undefined;
+
   const imgSource = item.imageBase64
     ? { uri: `data:image/jpeg;base64,${item.imageBase64}` }
     : item.imageUrl

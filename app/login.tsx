@@ -4,13 +4,9 @@ import {
   Pressable, Text, View, ScrollView, Platform
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import { makeRedirectUri } from "expo-auth-session";
-import Constants from "expo-constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Crypto from "expo-crypto";
 
 WebBrowser.maybeCompleteAuthSession();
 

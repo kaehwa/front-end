@@ -168,8 +168,8 @@ export default function LetterPage() {
       const data = await res.json();
       console.log("POST 결과:", data);
 
-      // 2️⃣ POST 완료 후 페이지 이동
-      router.push({ pathname: "/card", params: { id: orderID ?? "" } });
+      // 2️⃣ POST 완료 후 페이지 이동 --> 완료 페이지로 로딩
+      router.push({ pathname: "/DanbiLoadingScreen_before_card", params: { orderID: orderID ?? "" } });
     } catch (err) {
       console.error("POST 실패:", err);
     }

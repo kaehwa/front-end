@@ -77,11 +77,6 @@ export default function ListeningMission() {
     /** 현재 질문 */
     const currentQuestion = QUESTIONS[currentIndex]
 
-    /** 다음 버튼 핸들러 */
-    const handleOk = async () => {
-        changeExpression();
-    };
-
     /** 완료 팝업 */
     const handleModalOK = () => {
         console.log("move to voice")

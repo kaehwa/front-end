@@ -16,6 +16,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { Audio } from "expo-av";
 import * as FileSystem from 'expo-file-system';
+import { uploadAudio } from "./uploads"
 
 export default function ListeningMission() {
   /** 질문 & 플레이스홀더 */
@@ -43,6 +44,7 @@ export default function ListeningMission() {
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const { orderID } = useLocalSearchParams<{ orderID: string }>();
+  const [showNotModal, setShowNotModal] = useState(false);
 
   /** 서버 설정 */
   const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
@@ -150,7 +152,6 @@ export default function ListeningMission() {
       const res = await fetch(`${BACK_SWAGGER_URL}/flowers/${orderID}/voice`, {
         method: "POST",
         body: formData,
-
       });
 
       console.log("서버 응답:", await res.json());
@@ -159,6 +160,24 @@ export default function ListeningMission() {
     }
   };
 
+  const handleAudioUpload = async () => {
+      try {
+          const result = await uploadAudio(BACK_SWAGGER_URL, orderID);
+
+          if (!result) {
+              console.log("not uploaded")
+              setShowNotModal(true)
+              return;
+          }
+
+          // 업로드 성공
+          console.log("success uploaded")
+          setShowDoneModal(true); // 모달 열기
+      } catch (err) {
+          console.error(err);
+          alert("이미지 업로드 실패, 관리자에게 문의 바랍니다.");
+      }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -208,6 +227,18 @@ export default function ListeningMission() {
           </Text>
         </TouchableOpacity>
       </View>
+      
+
+      <View style={styles.formArea}>
+        <TouchableOpacity
+          style={[
+            styles.cta,
+          ]}
+          onPress={handleAudioUpload}
+        >
+          <Text style={styles.ctaText}>음성 업로드</Text>
+        </TouchableOpacity>
+      </View>   
 
       {/* 완료 팝업 */}
       <Modal

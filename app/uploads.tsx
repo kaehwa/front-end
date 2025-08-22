@@ -2,7 +2,6 @@
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 
-
 /**
  * 이미지(jpg, png 등) 선택 후 서버 업로드
  * @param baseUrl 서버 기본 URL (예: http://4.240.103.29:8080)
@@ -64,7 +63,7 @@ export const uploadImage = async (baseUrl: string, id: string) => {  try {
  */
 export const uploadAudio = async (baseUrl: string, id: string) => {
 
-  const { isRecording, recordedUri, startRecording, stopRecording, saveRecording } = useRecording();
+  // const { isRecording, recordedUri, startRecording, stopRecording, saveRecording } = useRecording();
   try {
     // 1. 오디오 파일 선택
     const audioResult = await DocumentPicker.getDocumentAsync({
@@ -82,7 +81,9 @@ export const uploadAudio = async (baseUrl: string, id: string) => {
     formData.append("file", blob, audioResult.assets[0].name);
 
     // 3. 서버 업로드
+    
     const apiUrl = `${baseUrl}/flowers/${id}/voice`;
+    console.log(`fatch to url => ${baseUrl}`)
     const response = await fetch(apiUrl, {
       method: "POST",
       body: formData,

@@ -92,6 +92,9 @@ export default function CalendarScreen() {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await res.json();
       if (data.error) throw new Error(data.error?.message || "불러오기에 실패했어요.");
+        
+      console.log("calender data")
+      console.log(data)
       setMonthEvents(Array.isArray(data.items) ? data.items : []);
     } catch (e: any) {
       setError(e?.message ?? "알 수 없는 오류가 발생했어요.");
@@ -174,7 +177,7 @@ export default function CalendarScreen() {
 
   /** 오늘 일정 → 여러 개의 단비 말풍선 데이터 */
   const todayDanbiList = useMemo(() => {
-    if (!isTodayYMD(selectedDate) || eventsOfSelected.length === 0) return [];
+    if (!isWithinAWeek(selectedDate) || eventsOfSelected.length === 0) return [];
     return buildDanbiMessagesForEvents(eventsOfSelected);
   }, [selectedDate, eventsOfSelected]);
 
@@ -267,7 +270,7 @@ export default function CalendarScreen() {
         )}
 
         {/* ✅ 오늘일 때만: 키워드에 걸린 만큼 단비 말풍선 여러 개 */}
-        {isTodayYMD(selectedDate) && !suggestionDismissed && todayDanbiList.map((it) => (
+        {isWithinAWeek(selectedDate) && !suggestionDismissed && todayDanbiList.map((it) => (
           <DanbiSuggestionBubble
             key={it.id}
             title={it.title}
@@ -278,7 +281,7 @@ export default function CalendarScreen() {
         ))}
 
         {/* 오늘 일정 아래: 1년 전 오늘 스토리 */}
-        {isTodayYMD(selectedDate) && (
+        {isWithinAWeek(selectedDate) && (
           <StoryCard loading={yearAgoLoading} story={yearAgoStory} onReload={fetchYearAgoToday} />
         )}
 
@@ -472,6 +475,8 @@ function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 
 function endOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59); }
 function formatYM(d: Date) { return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long" }).format(d); }
 function isTodayYMD(ymd: string) { return toYMD(new Date()) === ymd; }
+function isWithinAWeek(ymd: string) { return Math.abs(new Date(ymd).getTime() - Date.now()) <= 7 * 24 * 60 * 60 * 1000; }
+
 
 /** ====== 스타일 ====== */
 const styles = StyleSheet.create({

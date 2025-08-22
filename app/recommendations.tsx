@@ -121,7 +121,7 @@ export default function Recommendations() {
     try {
       const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/bouquet-similar`);
       const raw: BackendReco[] = await res.json();
-      console.log(`${BACKEND_URL}/flowers/${ID}/similar`)
+      console.log(`${BACKEND_URL}/flowers/${ID}/bouquet-similar`)
       console.log("raw")
       console.log(raw)
       const resData: Bouquet[] = raw.map((r: BackendReco) => ({
@@ -137,8 +137,8 @@ export default function Recommendations() {
         tags: r.tags,
         price: r.price,
       }));
-
       setItems(resData.slice(0, 4));
+
     } catch (e) {
       setError("추천을 불러오는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.");
       setItems(null);
@@ -159,7 +159,7 @@ export default function Recommendations() {
 
   // 카드 탭 → 결제(toss)로 이동
   const onPressCard = (item: Bouquet) => {
-    const orderId = `order_${Date.now()}_${item.id}`;
+    //const orderId = `order_${Date.now()}_${item.id}`;
     const amount = item.price ?? 0;
     const orderName = item.title;
 
@@ -168,11 +168,28 @@ export default function Recommendations() {
       ? LOCAL_BOUQUETS.r1
       : item.imageUrl || "";
 
-   
-    // router.push({
-    //   pathname: "/confirm",
-    //   params: { id: item.id, title: item.title },
-    // });
+      ////////////////////////부켓 선택시 해당 id로 가도록 POST/////////////////////////
+      try {
+        console.log(`Fetch To ${BACKEND_URL}/flowers/${orderID}/bouquet-selection`)
+        console.log(`item.id => ${item.id}`)
+        const payload = {
+          selectedBouquetId: item.id,
+        };
+        const response = fetch(`${BACKEND_URL}/flowers/${orderID}/bouquet-selection`, 
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = response.json();
+        console.log("POST 성공:", data);
+        //console.log("ID:", data.id);
+        return data;
+      } catch (e) {
+        console.log("POST 실패:");
+        console.log(e);
+      }
+      //////////////////////////////////////////////////////////////////////////////
   
     router.push({
       pathname: "/confirm",

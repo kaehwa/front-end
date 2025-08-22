@@ -43,7 +43,7 @@ type CardPayload = {
   videoLocal?: number | null;
   audioUrl?: string | null;
   coverImageUrl?: string | null;
-   backImageUrl?: string | null;   // ✅ 뒷면 이미지 URL
+  backImageUrl?: string | null;   // ✅ 뒷면 이미지 URL
   createdAtIso?: string | null;
   recipientName?: string | null;
 };
@@ -56,8 +56,9 @@ function formatKoDate(d = new Date()) {
   return `${yyyy}.${mm}.${dd}.`;
 }
 
+const BACKEND_URL = "http://4.240.103.29:8080";
 export default function CardScreen() {
-  const { id, to } = useLocalSearchParams<{ id?: string; to?: string }>();
+  const { orderID, to } = useLocalSearchParams<{ orderID?: string; to?: string }>();
   const insets = useSafeAreaInsets();
 
   // ── 인트로(봉투) ─────────────────────────────────────────────────────────
@@ -137,29 +138,54 @@ export default function CardScreen() {
     });
   }, [hideSwipeCue, swipeCueOpacity]);
 
-  const stableId = typeof id === "string" ? id : id ? String(id) : "";
+  const stableId = orderID
   const fetchedRef = useRef(false);
   
   const fetchCard = useCallback(async (cardId: string) => {
-    if (!cardId || fetchedRef.current) return;
+    // if (!cardId || fetchedRef.current) return;
     fetchedRef.current = true;
     setErr(null);
     setLoading(true);
     try {
+      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/medialetter`);
+      const raw = await res.json();
+      console.log(raw)
+      function insertLineBreaksWithDot(str: string, size: number = 25) {
+        let result = "";
+        let start = 0;
+
+        while (start < str.length) {
+          let end = start + size;
+
+          // 25자 범위 내에서 온점(.) 발견하면 그 뒤까지 잘라서 줄바꿈
+          const dotIndex = str.lastIndexOf(".", end);
+          if (dotIndex >= start) {
+            end = dotIndex + 1; // 온점 포함
+          }
+
+          result += str.slice(start, end) + "\n";
+          start = end;
+        }
+
+        return result.trim(); // 마지막 \n 제거
+      }
+
+
+      // 사용 예시
+      const formatMessage = insertLineBreaksWithDot(raw.recommendMessage, 28);
+
       const json: CardPayload = {
-        id: String(cardId),
-        letter:
-          "사랑하는 당신에게,\n" +
-          "오늘 내 마음을 꽃으로 전해요.\n" +
-          "바쁜 하루 속에서도 이 카드가 작은 쉼표가 되길 바라요.\n" +
-          "늘 곁에 있을게요.\n그대, 화(花)야와 함께.",
-        videoUrl: null,
+        id: String(orderID),
+        letter: formatMessage,//raw.recommendMessage,
+        videoUrl: raw.videoletterUrl,
         videoLocal: LOCAL_VIDEO,
-        audioUrl: null, // ✅ 오디오 URL이 오면 이 길이를 우선 사용
+        audioUrl: raw.voiceletterBase64,  // ✅ 오디오 URL이 오면 이 길이를 우선 사용
         coverImageUrl: "https://picsum.photos/seed/polar/1200/1600",
         createdAtIso: null,
         recipientName: null,
+        backImageUrl : raw.bouquetVideoUrl //꽃 영상 위치
       };
+      console.log(json);
       setData(json);
     } catch (e){
       console.log("error")
@@ -189,7 +215,11 @@ export default function CardScreen() {
   useEffect(() => {
     let mounted = true;
     const loadAudio = async () => {
-      if (!data?.audioUrl) return;
+      if (!data?.audioUrl) 
+        {
+          console.log("audio not found")
+          return;
+        }
       try {
         const { sound, status } = await Audio.Sound.createAsync(
           { uri: data.audioUrl },
@@ -203,7 +233,7 @@ export default function CardScreen() {
         if ("durationMillis" in status && typeof status.durationMillis === "number") {
           setMediaDurationMs(status.durationMillis);
         }
-      } catch {}
+      } catch (e) { console.log("Audio load error", e); }
     };
     loadAudio();
     return () => {
@@ -452,26 +482,27 @@ export default function CardScreen() {
           ]}
         >
           {/* 종이질감 */}
-          <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} />
+          {/* <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} /> */}
 
           {/* 폴라로이드 묶음 */}
           <View style={styles.polaroidWrap}>
             <View style={styles.polaroidInner}>
               <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
               <View style={styles.photoArea}>
+              {/* <Image source={{ uri: coverUri }} style={styles.video} /> */}
                 {videoSource ? (
                   <Video
                     ref={videoRef}
                     source={videoSource as any}
-                    style={styles.video}
+                    style={[styles.video, {position: "relative"}]}
                     resizeMode={ResizeMode.COVER}
                     onPlaybackStatusUpdate={onStatusUpdate}
-                    shouldPlay={false}
-                    isLooping={false}
-                    useNativeControls={false}
-                    usePoster={false}
-                    posterSource={{ uri: coverUri }}
-                    posterStyle={styles.video}
+                    // shouldPlay={false}
+                    // isLooping={false}
+                    // useNativeControls={false}
+                    // usePoster={false}
+                    // posterSource={{ uri: coverUri }}
+                    // posterStyle={styles.video}
                   />
                 ) : (
                   <Image source={{ uri: coverUri }} style={styles.video} />
@@ -491,7 +522,7 @@ export default function CardScreen() {
 
               <View style={styles.bottomCaption}>
                 <Text style={styles.bottomCaptionText}>
-                  {formatKoDate()} 사랑하는 {nameForCaption}에게
+                  {formatKoDate()} 사랑하는 000 {nameForCaption}에게
                 </Text>
               </View>
 
@@ -596,7 +627,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   cardBase: {
-    position: "absolute",
+    position: "relative",
     width: "100%",
     height: "100%",
     backgroundColor: "#FFFFFF",
@@ -623,6 +654,7 @@ const styles = StyleSheet.create({
   // 앞면 콘텐츠
   polaroidWrap: {
     width: "100%",
+    height: "100%",
     alignItems: "center",
     paddingTop: 8,
   },
@@ -661,7 +693,7 @@ const styles = StyleSheet.create({
   },
   //video: {height: "100%"},//{ width: "", height: "100%", position: "relative"},
   video: {
-    ...StyleSheet.absoluteFillObject, // 부모 영역 완전히 채움
+    // ...StyleSheet.absoluteFillObject, // 부모 영역 완전히 채움
     width: "100%",
     height: "100%",
     position: "relative",
@@ -813,3 +845,4 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 });
+

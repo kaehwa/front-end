@@ -288,7 +288,7 @@ export default function LetterPage() {
         <View style={styles.footerCtas}>
           <Pressable
             style={[styles.btnWide, styles.btnPrimary]}
-            onPress={() => router.push({ pathname: "/card", params: { id: id ?? "" } })}
+            onPress={() => router.push({ pathname: "/card", params: { id: 1 ?? "", letter: draft } })}
             accessibilityLabel="주문으로 이동"
           >
             <Ionicons name="mail-outline" size={18} color="#fff" />

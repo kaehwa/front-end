@@ -129,7 +129,7 @@ export default function ListeningMission() {
       console.log("저장된 URI:", uri);
 
       // 서버 POST
-      if (uri) await uploadRecording(uri);
+      if (uri) await uploadAndSaveRecording(uri);
 
       // 완료 모달 표시
       setShowRecorder(false);
@@ -139,111 +139,62 @@ export default function ListeningMission() {
     }
   };
 
-
-  async function webmToWavBlob(webmBlob: Blob): Promise<Blob> {
-    const arrayBuffer = await webmBlob.arrayBuffer();
-
-    // 1️⃣ AudioContext로 디코딩
-    const audioContext = new AudioContext();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-    // 2️⃣ PCM 데이터 추출
-    const wavBuffer = encodeWAV(audioBuffer);
-
-    // 3️⃣ Blob으로 감싸기 (MIME = wav)
-    return new Blob([wavBuffer], { type: "audio/wav" });
-  }
-
-  function encodeWAV(audioBuffer: AudioBuffer): ArrayBuffer {
-    const numChannels = audioBuffer.numberOfChannels;
-    const sampleRate = audioBuffer.sampleRate;
-    const format = 1; // PCM
-    const bitDepth = 16;
-
-    let samples: Float32Array;
-    if (numChannels === 2) {
-      const ch1 = audioBuffer.getChannelData(0);
-      const ch2 = audioBuffer.getChannelData(1);
-      samples = interleave(ch1, ch2);
-    } else {
-      samples = audioBuffer.getChannelData(0);
-    }
-
-    const buffer = new ArrayBuffer(44 + samples.length * 2);
-    const view = new DataView(buffer);
-
-    // WAV Header 작성
-    writeString(view, 0, "RIFF");
-    view.setUint32(4, 36 + samples.length * 2, true);
-    writeString(view, 8, "WAVE");
-    writeString(view, 12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, format, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * numChannels * bitDepth / 8, true);
-    view.setUint16(32, numChannels * bitDepth / 8, true);
-    view.setUint16(34, bitDepth, true);
-    writeString(view, 36, "data");
-    view.setUint32(40, samples.length * 2, true);
-
-    floatTo16BitPCM(view, 44, samples);
-
-    return buffer;
-  }
-
-  function interleave(ch1: Float32Array, ch2: Float32Array): Float32Array {
-    const length = ch1.length + ch2.length;
-    const result = new Float32Array(length);
-    let index = 0, inputIndex = 0;
-
-    while (index < length) {
-      result[index++] = ch1[inputIndex];
-      result[index++] = ch2[inputIndex];
-      inputIndex++;
-    }
-    return result;
-  }
-
-  function floatTo16BitPCM(view: DataView, offset: number, input: Float32Array) {
-    for (let i = 0; i < input.length; i++, offset += 2) {
-      let s = Math.max(-1, Math.min(1, input[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    }
-  }
-
-  function writeString(view: DataView, offset: number, str: string) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-
-  const uploadRecording = async (uri: string) => {
+  const uploadAndSaveRecording = async (uri: string) => {
     try {
-      // 1️⃣ URI를 fetch로 읽어서 blob으로 변환
+      // 1️⃣ URI → blob 변환
       const response = await fetch(uri);
       const blob = await response.blob();
 
-      const wavBlob = await webmToWavBlob(blob);
+      // 2️⃣ wav 파일로 앱 로컬에 저장
+      const fileUri = FileSystem.documentDirectory + `voice_${orderID}.wav`;
+      const reader = new FileReader();
 
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        await FileSystem.writeAsStringAsync(fileUri, base64.split(",")[1], {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        console.log("로컬 저장 완료:", fileUri);
 
-      // 2️⃣ FormData에 blob 추가
-      const formData = new FormData();
-      formData.append("file", wavBlob, `voice_${orderID}.wav`);
-      console.log(wavBlob)
+        // 3️⃣ 서버 업로드
+        const formData = new FormData();
+        formData.append("file", blob, `voice_${orderID}.wav`);
+        const res = await fetch(`${BACK_SWAGGER_URL}/flowers/${orderID}/voice`, {
+          method: "POST",
+          body: formData,
+        });
 
-      // 3️⃣ 서버로 POST
-      const res = await fetch(`${BACK_SWAGGER_URL}/flowers/${orderID}/voice`, {
-        method: "POST",
-        body: formData,
-      });
+        console.log("서버 응답:", await res.json());
+      };
 
-      console.log("서버 응답:", await res.json());
+      reader.readAsDataURL(blob);
     } catch (err) {
       console.log("업로드 실패:", err);
     }
   };
 
+  // const uploadRecording = async (uri: string) => {
+  //   try {
+  //     // 1️⃣ URI를 fetch로 읽어서 blob으로 변환
+  //     const response = await fetch(uri);
+  //     const blob = await response.blob();
+
+  //     // 2️⃣ FormData에 blob 추가
+  //     const formData = new FormData();
+  //     formData.append("file", blob, `voice_${orderID}.wav`);
+  //     console.log(blob)
+
+  //     // 3️⃣ 서버로 POST
+  //     const res = await fetch(`${BACK_SWAGGER_URL}/flowers/${orderID}/voice`, {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     console.log("서버 응답:", await res.json());
+  //   } catch (err) {
+  //     console.log("업로드 실패:", err);
+  //   }
+  // };
 
   const handleAudioUpload = async () => {
       try {

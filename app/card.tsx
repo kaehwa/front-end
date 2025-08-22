@@ -147,9 +147,12 @@ export default function CardScreen() {
     setErr(null);
     setLoading(true);
     try {
+      console.log(`fetch ---> ${BACKEND_URL}/flowers/${orderID}/medialetter`)
       const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/medialetter`);
       const raw = await res.json();
+      console.log(`raw`)
       console.log(raw)
+
       function insertLineBreaksWithDot(str: string, size: number = 25) {
         let result = "";
         let start = 0;
@@ -174,19 +177,19 @@ export default function CardScreen() {
       // 사용 예시
       const formatMessage = insertLineBreaksWithDot(raw.recommendMessage, 28);
 
-      const json: CardPayload = {
+      const cardP: CardPayload = {
         id: String(orderID),
         letter: formatMessage,//raw.recommendMessage,
         videoUrl: raw.videoletterUrl,
         videoLocal: LOCAL_VIDEO,
         audioUrl: raw.voiceletterBase64,  // ✅ 오디오 URL이 오면 이 길이를 우선 사용
         coverImageUrl: "https://picsum.photos/seed/polar/1200/1600",
-        createdAtIso: null,
+        createdAtIso: null, //지워도 될듯?
         recipientName: null,
         backImageUrl : raw.bouquetVideoUrl //꽃 영상 위치
       };
-      console.log(json);
-      setData(json);
+      
+      setData(cardP);
     } catch (e){
       console.log("error")
       console.log(e)
@@ -211,7 +214,7 @@ export default function CardScreen() {
     }
   }, [stableId, fetchCard]);
 
-  // (옵션) 오디오 길이
+  // (옵션) 오디오 길이 (재생)
   useEffect(() => {
     let mounted = true;
     const loadAudio = async () => {
@@ -471,7 +474,7 @@ export default function CardScreen() {
       >
         <Text style={styles.nextBtnText}>다음</Text>
       </Pressable>
-
+     
       {/* 카드(축 고정) — 스와이프 핸들러만 부착 */}
       <Animated.View style={[styles.cardShadowWrap, { opacity: mainOpacity }]} {...swipeResponder.panHandlers}>
         {/* 앞면 */}
@@ -693,7 +696,7 @@ const styles = StyleSheet.create({
   },
   //video: {height: "100%"},//{ width: "", height: "100%", position: "relative"},
   video: {
-    // ...StyleSheet.absoluteFillObject, // 부모 영역 완전히 채움
+    ...StyleSheet.absoluteFillObject, // 부모 영역 완전히 채움
     width: "100%",
     height: "100%",
     position: "relative",

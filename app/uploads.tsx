@@ -83,7 +83,7 @@ export const uploadAudio = async (baseUrl: string, id: string) => {
     // 3. 서버 업로드
     
     const apiUrl = `${baseUrl}/flowers/${id}/voice`;
-    console.log(`fatch to url => ${baseUrl}`)
+    console.log('fatch to url => ${baseUrl}/flowers/${id}/voice')
     const response = await fetch(apiUrl, {
       method: "POST",
       body: formData,

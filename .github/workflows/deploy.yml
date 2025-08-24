@@ -31,10 +31,15 @@ jobs:
       - name: Verify build output
         run: ls -la .next
 
+      - name: Save SSH key
+        run: |
+          echo "${{ secrets.AZURE_SSH_KEY }}" > ./azure_key
+          chmod 600 ./azure_key
+
       - name: Deploy to Azure VM via SCP
         run: |
           echo "Deploying to Azure VM..."
-          scp -i ${{ secrets.AZURE_SSH_KEY }} -r \
+          scp -i ./azure_key -r \
             .next/* \
             public/* \
             package.json \
@@ -44,5 +49,5 @@ jobs:
 
       - name: Reload nginx
         run: |
-          ssh -i ${{ secrets.AZURE_SSH_KEY }} ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
+          ssh -i ./azure_key ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
           "sudo systemctl reload nginx"

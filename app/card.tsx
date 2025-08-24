@@ -67,7 +67,7 @@ function formatKoDate(d = new Date()) {
   return `${yyyy}.${mm}.${dd}.`;
 }
 
-const BACKEND_URL = "http://4.240.103.29:8080";
+const BACKEND_URL = "/api";
 
 export default function CardScreen() {
   const { orderID, to,bg } = useLocalSearchParams<{ orderID?: string; to?: string; bg?: string }>();

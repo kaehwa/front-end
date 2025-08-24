@@ -1,0 +1,49 @@
+name: Deploy Web to Azure VM
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: gaehwa-web   # 👉 웹 코드 위치 지정
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --force
+
+      - name: Build Next.js (Export)
+        run: |
+          npm run build
+          npm run export   # 👉 out/ 폴더 생김
+
+      - name: Deploy to Azure VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          source: "gaehwa-web/out/*"
+          target: "/var/www/expogo"
+
+      - name: Reload nginx
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            sudo systemctl reload nginx

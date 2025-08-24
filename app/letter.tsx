@@ -17,7 +17,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
-const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "/api"; // TODO: 실제 주소로 교체
 const MAX_LEN = 1000; // 글자 제한 (원하면 조정)
 
 type LetterResponse = {

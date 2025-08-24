@@ -17,7 +17,7 @@ const TEXT = "#1F2937";
 const SUB = "#6b7280";
 const ACCENT = "#FB7431";
 
-const BACKEND_URL = "http://4.240.103.29:8080"; // 준비되면 교체
+const BACKEND_URL = "/api"; // 준비되면 교체
 
 /** ===== 로컬 더미 에셋 맵 =====
  *  프로젝트 경로에 맞게 이미지 파일만 넣어주면 바로 작동합니다.

@@ -32,7 +32,7 @@ export default function CheckoutScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
 
-  const BACKEND_URL = "http://4.240.103.29:8080"; // same backend as other screens
+  const BACKEND_URL = "/api"; // same backend as other screens
 
   // 주문 데이터: 초기값은 데모, 서버에서 id로 불러오면 대체
   const [summary, setSummary] = useState<OrderSummary>({

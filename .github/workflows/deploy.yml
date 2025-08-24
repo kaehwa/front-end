@@ -31,27 +31,18 @@ jobs:
       - name: Verify build output
         run: ls -la .next
 
-      - name: Deploy to Azure VM
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.AZURE_HOST }}
-          username: ${{ secrets.AZURE_USER }}
-          key: ${{ secrets.AZURE_SSH_KEY }}
-          source: |
-            .next/**/*          # <-- 모든 하위 파일 포함
-            public/**/*         # public 폴더 전체
-            package.json
-            package-lock.json
-            next.config.js
-          target: "/var/www/expogo"
-          strip_components: 0
-          overwrite: true
+      - name: Deploy to Azure VM via SCP
+        run: |
+          echo "Deploying to Azure VM..."
+          scp -i ${{ secrets.AZURE_SSH_KEY }} -r \
+            .next/* \
+            public/* \
+            package.json \
+            package-lock.json \
+            next.config.js \
+            ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:/var/www/expogo
 
       - name: Reload nginx
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.AZURE_HOST }}
-          username: ${{ secrets.AZURE_USER }}
-          key: ${{ secrets.AZURE_SSH_KEY }}
-          script: |
-            sudo systemctl reload nginx
+        run: |
+          ssh -i ${{ secrets.AZURE_SSH_KEY }} ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
+          "sudo systemctl reload nginx"

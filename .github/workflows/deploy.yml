@@ -9,28 +9,28 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: gaehwa-web
-
     steps:
+      # 1. 코드 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2. Node.js 세팅
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 22
 
+      # 3. 의존성 설치
       - name: Install dependencies
         run: npm install --force
+        working-directory: gaehwa-web
 
+      # 4. Next.js 빌드
       - name: Build Next.js
         run: npm run build -- --no-lint
+        working-directory: gaehwa-web
 
-      - name: Verify build output
-        run: ls -la .next
-
+      # 5. Azure VM로 배포
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -38,15 +38,16 @@ jobs:
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           source: |
-            .next/
-            public/
-            package.json
-            package-lock.json
-            next.config.js
+            gaehwa-web/.next/
+            gaehwa-web/public/
+            gaehwa-web/package.json
+            gaehwa-web/package-lock.json
+            gaehwa-web/next.config.js
           target: "/var/www/expogo"
-          strip_components: 0
+          strip_components: 1
           overwrite: true
 
+      # 6. nginx reload
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7
         with:

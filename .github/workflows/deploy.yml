@@ -19,12 +19,17 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --force
-        working-directory: gaehwa-web
+        run: |
+          cd gaehwa-web
+          npm install --force
 
       - name: Build Next.js
-        run: npm run build -- --no-lint
-        working-directory: gaehwa-web
+        run: |
+          cd gaehwa-web
+          npm run build -- --no-lint
+
+      - name: Check .next folder
+        run: ls -la gaehwa-web/.next
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
@@ -33,13 +38,12 @@ jobs:
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           source: |
-            gaehwa-web/.next
-            gaehwa-web/public
+            gaehwa-web/.next/
+            gaehwa-web/public/
             gaehwa-web/package.json
             gaehwa-web/package-lock.json
             gaehwa-web/next.config.js
-          target: /var/www/expogo
-          strip_components: 1  # 불필요한 상위 디렉토리 제거
+          target: "/var/www/expogo"
 
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7
@@ -47,4 +51,5 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          script: sudo systemctl reload nginx
+          script: |
+            sudo systemctl reload nginx

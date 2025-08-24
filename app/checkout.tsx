@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -32,8 +32,10 @@ export default function CheckoutScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
 
-  // 데모용 주문 데이터 (실제론 서버에서 카드/선택정보로 계산)
-  const summary: OrderSummary = useMemo(() => ({
+  const BACKEND_URL = "http://4.240.103.29:8080"; // same backend as other screens
+
+  // 주문 데이터: 초기값은 데모, 서버에서 id로 불러오면 대체
+  const [summary, setSummary] = useState<OrderSummary>({
     id: String(id ?? "demo"),
     title: "라벤더 포에틱",
     imageUrl: "https://picsum.photos/seed/finalbouquet/1200/1600",
@@ -41,9 +43,39 @@ export default function CheckoutScreen() {
     price: 68000,
     deliveryFee: 3000,
     discount: 0,
-  }), [id]);
-
+  });
   const total = Math.max(0, summary.price + summary.deliveryFee - summary.discount);
+
+  // load order/summary from backend when id is provided
+  useEffect(() => {
+    let mounted = true;
+    if (!id) return;
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/orders/${id}`);
+        if (!mounted) return;
+        if (!res.ok) return; // keep demo summary
+        const raw = await res.json();
+        // map backend response fields to OrderSummary shape (best-effort)
+        const mapped: OrderSummary = {
+          id: String(raw.id ?? id),
+          title: raw.title ?? raw.productName ?? summary.title,
+          imageUrl: raw.imageUrl ?? raw.productImageUrl ?? summary.imageUrl,
+          letterSnippet: raw.letterSnippet ?? raw.messageSnippet ?? summary.letterSnippet,
+          price: typeof raw.price === "number" ? raw.price : summary.price,
+          deliveryFee: typeof raw.deliveryFee === "number" ? raw.deliveryFee : summary.deliveryFee,
+          discount: typeof raw.discount === "number" ? raw.discount : summary.discount,
+        };
+        setSummary(mapped);
+      } catch (e) {
+        // ignore and keep demo summary
+        console.log("checkout: fetch summary failed", e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   // 배송 정보
   const [recipient, setRecipient] = useState("");

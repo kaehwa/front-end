@@ -17,6 +17,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Video, ResizeMode, AVPlaybackStatusSuccess, Audio } from "expo-av";
 import EnvelopeOverlay from "../app/EnvelopeOverlay";
+import * as FileSystem from "expo-file-system";
 
 // ── 화면/카드 치수 ───────────────────────────────────────────────────────────
 const { width, height } = Dimensions.get("window");
@@ -33,17 +34,16 @@ const PAPER_TEXTURE =
 // ── 로컬 리소스 ─────────────────────────────────────────────────────────────
 const LOCAL_VIDEO = require("../assets/videos/file.mp4");
 const CORNER_TAPE = require("../assets/images/tape.png");
-const BACK_GIF = require("../assets/videos/file.gif");
 
 // ── 타입 ────────────────────────────────────────────────────────────────────
 type CardPayload = {
   id: string;
   letter: string;
-  videoUrl?: string | null;
-  videoLocal?: number | null;
-  audioUrl?: string | null;
+  videoUrl?: string | null;     // 절대 URL 또는 file://
+  videoLocal?: number | null;   // require(...) 모듈 아이디
+  audioUrl?: string | null;     // 절대 URL 또는 file://
   coverImageUrl?: string | null;
-  backImageUrl?: string | null;   // ✅ 뒷면 이미지 URL
+  backImageUrl?: string | null;
   createdAtIso?: string | null;
   recipientName?: string | null;
 };
@@ -57,6 +57,7 @@ function formatKoDate(d = new Date()) {
 }
 
 const BACKEND_URL = "http://4.240.103.29:8080";
+
 export default function CardScreen() {
   const { orderID, to } = useLocalSearchParams<{ orderID?: string; to?: string }>();
   const insets = useSafeAreaInsets();
@@ -79,12 +80,35 @@ export default function CardScreen() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // 미디어
-  const videoRef = useRef<Video>(null);
+  // 미디어 상태
   const [isPlaying, setIsPlaying] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
   const [mediaDurationMs, setMediaDurationMs] = useState<number>(0);
+
+  // 오디오 핸들
   const soundRef = useRef<Audio.Sound | null>(null);
+
+  // 오버레이 비디오 핸들
+  const overlayVideoRef = useRef<Video>(null);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const [overlayAspect, setOverlayAspect] = useState<number | null>(null);
+  const [overlaySize, setOverlaySize] = useState<{ width: number; height: number } | null>(null);
+  const overlayScale = useRef(new Animated.Value(0.96)).current;
+
+  const onCloseOverlay = () => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(overlayScale, { toValue: 0.96, duration: 220, useNativeDriver: true }),
+    ]).start(async () => {
+      setOverlayVisible(false);
+      try {
+        await overlayVideoRef.current?.setStatusAsync({ shouldPlay: false, positionMillis: 0 });
+      } catch {}
+      setOverlaySize(null);
+      showSwipeCueBriefly();
+    });
+  };
 
   // ── Letter reveal ────────────────────────────────────────────────────────
   const [visibleLineCount, setVisibleLineCount] = useState(0);
@@ -122,7 +146,6 @@ export default function CardScreen() {
     }).start(() => setShowSwipeCue(false));
   }, [showSwipeCue, swipeCueOpacity]);
 
-  // 스와이프 힌트 자동 노출/자동 종료
   const showSwipeCueBriefly = useCallback(() => {
     setShowSwipeCue(true);
     swipeCueOpacity.setValue(0);
@@ -131,68 +154,169 @@ export default function CardScreen() {
       duration: 220,
       useNativeDriver: true,
     }).start(() => {
-      // 2.5초 뒤 자동 숨김
       setTimeout(() => {
         hideSwipeCue();
-      }, 1.500);
+      }, 1500);
     });
   }, [hideSwipeCue, swipeCueOpacity]);
 
-  const stableId = orderID
+  const stableId = orderID;
   const fetchedRef = useRef(false);
-  
+
+  // ── URI 정규화 ────────────────────────────────────────────────────────────
+  const isLocalLike = (u?: string | null) => !!u && /^(file:|asset:|content:)/i.test(u);
+  const normalizeRemote = (u?: string | null) => {
+    if (!u) return null;
+    if (/^https?:\/\//i.test(u) || isLocalLike(u)) return u; // 이미 절대 or 로컬
+    const prefix = BACKEND_URL.replace(/\/$/, "");
+    const path = String(u).replace(/^\//, "");
+    return `${prefix}/${path}`;
+  };
+
   const fetchCard = useCallback(async (cardId: string) => {
-    // if (!cardId || fetchedRef.current) return;
     fetchedRef.current = true;
     setErr(null);
     setLoading(true);
     try {
-      console.log(`fetch ---> ${BACKEND_URL}/flowers/${orderID}/medialetter`)
-      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/medialetter`);
+      const res = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = await res.json();
-      console.log(`raw`)
-      console.log(raw)
 
+      // 문장 줄바꿈 포맷
       function insertLineBreaksWithDot(str: string, size: number = 25) {
+        if (!str) return "";
         let result = "";
         let start = 0;
-
         while (start < str.length) {
           let end = start + size;
-
-          // 25자 범위 내에서 온점(.) 발견하면 그 뒤까지 잘라서 줄바꿈
           const dotIndex = str.lastIndexOf(".", end);
-          if (dotIndex >= start) {
-            end = dotIndex + 1; // 온점 포함
-          }
-
+          if (dotIndex >= start) end = dotIndex + 1;
           result += str.slice(start, end) + "\n";
           start = end;
         }
-
-        return result.trim(); // 마지막 \n 제거
+        return result.trim();
       }
-
-
-      // 사용 예시
       const formatMessage = insertLineBreaksWithDot(raw.recommendMessage, 28);
 
-      const cardP: CardPayload = {
-        id: String(orderID),
-        letter: formatMessage,//raw.recommendMessage,
-        videoUrl: raw.videoletterUrl,
-        videoLocal: LOCAL_VIDEO,
-        audioUrl: raw.voiceletterBase64,  // ✅ 오디오 URL이 오면 이 길이를 우선 사용
-        coverImageUrl: "https://picsum.photos/seed/polar/1200/1600",
-        createdAtIso: null, //지워도 될듯?
-        recipientName: null,
-        backImageUrl : raw.bouquetVideoUrl //꽃 영상 위치
+  // 백엔드에 서명된 URL을 요청해봅니다(백엔드가 지원하는 경우).
+      try {
+        const signedRes = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter?signed=true`);
+        if (signedRes.ok) {
+          const signedJson = await signedRes.json();
+          // backend may return signed video/audio URLs directly
+          if (signedJson.videoUrl || signedJson.videoletterUrl) {
+            const signedVideo = signedJson.videoUrl ?? signedJson.videoletterUrl;
+            // prefer signed URL from backend
+            videoUri = signedVideo || videoUri;
+          }
+          if (signedJson.audioUrl || signedJson.voiceletterUrl) {
+            const signedAudio = signedJson.audioUrl ?? signedJson.voiceletterUrl;
+            audioUri = signedAudio || audioUri;
+          }
+        }
+      } catch (e) {
+        // ignore — fallback to existing behavior
+        console.log('signed fetch failed', e);
+      }
+
+      // base64 → 파일 저장 (있을 때만)
+      let videoUri: string | null = raw.videoletterUrl ?? raw.videoUrl ?? raw.bouquetVideoUrl ?? null;
+      let audioUri: string | null = raw.voiceletterUrl ?? raw.audioUrl ?? raw.voiceUrl ?? null;
+
+      try {
+        const dir = `${FileSystem.documentDirectory}media/`;
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
+        const writeB64 = async (b64: string, filename: string) => {
+          const path = dir + filename;
+          await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+          return path; // file://...
+        };
+
+        const base64Video = raw.videoletterBase64 || raw.videoBase64 || raw.bouquetVideoBase64;
+        if (base64Video && typeof base64Video === "string") {
+          videoUri = await writeB64(base64Video, `video_${String(cardId)}.mp4`);
+        }
+
+        const base64Audio = raw.voiceletterBase64 || raw.audioBase64 || raw.voiceBase64;
+        if (base64Audio && typeof base64Audio === "string") {
+          audioUri = await writeB64(base64Audio, `audio_${String(cardId)}.m4a`);
+        }
+      } catch (e) {
+        console.log("base64 -> file write failed", e);
+      }
+
+      // 상대경로라면 절대 URL로 승격 (로컬 file:// 은 손대지 않음)
+      videoUri = normalizeRemote(videoUri);
+      audioUri = normalizeRemote(audioUri);
+
+      // 백엔드 요청
+      try {
+        const signedRes = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter?signed=true`);
+        if (signedRes.ok) {
+          const signedJson = await signedRes.json();
+          const signedVideo = signedJson.videoUrl ?? signedJson.videoletterUrl ?? null;
+          const signedAudio = signedJson.audioUrl ?? signedJson.voiceletterUrl ?? null;
+          if (signedVideo) videoUri = signedVideo;
+          if (signedAudio) audioUri = signedAudio;
+        }
+      } catch (e) {
+        console.log('signed fetch failed', e);
+      }
+
+  // 직접 블롭 접근이 실패(409 PublicAccessNotPermitted)하거나 네트워크/CORS 오류가 발생하면
+  // 로컬 프록시 엔드포인트로 폴백합니다(블롭을 스트리밍).
+      const PROXY_BASE = "http://localhost:3000";
+    const resolveWithProxy = async (u?: string | null): Promise<string | null> => {
+        if (!u) return null;
+        try {
+      // 프록시 폴백 대상은 Azure blob URL만 고려합니다
+          if (!/^https?:\/\//i.test(u)) return u;
+          const urlObj = new URL(u);
+      if (!urlObj.hostname.endsWith('blob.core.windows.net')) return u;
+
+          // 접근 가능 여부를 빠르게 확인하기 위해 HEAD 요청을 시도합니다
+          try {
+            const head = await fetch(u, { method: 'HEAD' });
+            if (head.ok) return u; // direct access works
+            // 서버가 공개 접근을 명시적으로 차단하면 프록시로 대체합니다
+            if (head.status === 409) {
+              const parts = urlObj.pathname.replace(/^\//, '').split('/');
+              parts.shift();
+              const blobPath = parts.join('/');
+              return `${PROXY_BASE}/proxy?blob=${encodeURIComponent(blobPath)}`;
+            }
+            // 그 외에는 원본 URL을 유지합니다
+            return u;
+          } catch (e) {
+            // 네트워크 또는 CORS 오류인 경우 프록시로 폴백합니다
+            const parts = urlObj.pathname.replace(/^\//, '').split('/');
+            parts.shift();
+            const blobPath = parts.join('/');
+            return `${PROXY_BASE}/proxy?blob=${encodeURIComponent(blobPath)}`;
+          }
+        } catch (e) {
+          return u ?? null;
+        }
       };
-      
+
+      videoUri = (await resolveWithProxy(videoUri)) ?? null;
+      audioUri = (await resolveWithProxy(audioUri)) ?? null;
+
+      const cardP: CardPayload = {
+        id: String(cardId),
+        letter: formatMessage,
+        videoUrl: videoUri,
+        videoLocal: videoUri ? null : LOCAL_VIDEO, // 서버가 없으면 로컬 대체
+        audioUrl: audioUri,
+        coverImageUrl: "https://picsum.photos/seed/polar/1200/1600",
+        createdAtIso: null,
+        recipientName: null,
+        backImageUrl: raw.bouquetVideoUrl || null,
+      };
+
       setData(cardP);
-    } catch (e){
-      console.log("error")
-      console.log(e)
+    } catch (e) {
+      console.log("fetch error", e);
       setErr("카드 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setLoading(false);
@@ -206,7 +330,6 @@ export default function CardScreen() {
     setVisibleLineCount(0);
     stopRevealTimers();
     setShowSwipeCue(false);
-    console.log("fetchCard", stableId);
     if (stableId) fetchCard(stableId);
     else {
       setLoading(false);
@@ -214,31 +337,54 @@ export default function CardScreen() {
     }
   }, [stableId, fetchCard]);
 
-  // (옵션) 오디오 길이 (재생)
+  // 오디오 모드
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: false,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: 1,
+      interruptionModeIOS: 1,
+    }).catch(() => {});
+  }, []);
+
+  // 오디오 로딩
   useEffect(() => {
     let mounted = true;
     const loadAudio = async () => {
-      if (!data?.audioUrl) 
-        {
-          console.log("audio not found")
-          return;
-        }
+      if (!data?.audioUrl) return;
       try {
+        if (soundRef.current) {
+          await soundRef.current.unloadAsync().catch(() => {});
+          soundRef.current = null;
+        }
         const { sound, status } = await Audio.Sound.createAsync(
           { uri: data.audioUrl },
-          { shouldPlay: false }
+          { shouldPlay: false },
+          (st) => {
+            if (!st || !("isLoaded" in st) || !st.isLoaded) return;
+            setIsPlaying(st.isPlaying ?? false);
+            setIsEnded((st as any).didJustFinish ?? false);
+            if (typeof st.durationMillis === "number") setMediaDurationMs(st.durationMillis);
+            if ((st as any).didJustFinish) showSwipeCueBriefly();
+          }
         );
         if (!mounted) {
           sound.unloadAsync().catch(() => {});
           return;
         }
         soundRef.current = sound;
+
         if ("durationMillis" in status && typeof status.durationMillis === "number") {
           setMediaDurationMs(status.durationMillis);
         }
-      } catch (e) { console.log("Audio load error", e); }
+      } catch (e) {
+        console.log("Audio load error", e);
+      }
     };
     loadAudio();
+
     return () => {
       mounted = false;
       if (soundRef.current) {
@@ -248,8 +394,8 @@ export default function CardScreen() {
     };
   }, [data?.audioUrl]);
 
-  // 비디오 상태
-  const onStatusUpdate = (s: any) => {
+  // 비디오 상태 (오버레이)
+  const onOverlayStatusUpdate = (s: any) => {
     if (!s) return;
     if ((s as AVPlaybackStatusSuccess).isLoaded) {
       const st = s as AVPlaybackStatusSuccess;
@@ -258,49 +404,116 @@ export default function CardScreen() {
       if (!data?.audioUrl && typeof st.durationMillis === "number") {
         setMediaDurationMs(st.durationMillis);
       }
-      // ▶︎ 영상이 막 끝났을 때, 스와이프 힌트 잠깐 노출
+      try {
+        const nat: any = (st as any).naturalSize ?? (st as any).naturalSize;
+        if (nat && typeof nat.width === "number" && typeof nat.height === "number" && nat.height > 0) {
+          setOverlayAspect(nat.width / nat.height);
+          setOverlaySize({ width: Math.round(nat.width), height: Math.round(nat.height) });
+        }
+      } catch {}
       if (st.didJustFinish) {
-        showSwipeCueBriefly();
+        Animated.parallel([
+          Animated.timing(overlayOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+          Animated.timing(overlayScale, { toValue: 0.96, duration: 260, useNativeDriver: true }),
+        ]).start(() => {
+          setOverlayVisible(false);
+          try {
+            overlayVideoRef.current?.setStatusAsync({ shouldPlay: false, positionMillis: 0 });
+          } catch {}
+          setOverlaySize(null);
+          showSwipeCueBriefly();
+        });
       }
     }
   };
 
-  const onPressControl = async () => {
+  // ── 재생 컨트롤 ──────────────────────────────────────────────────────────
+  const stopAudioIfPlaying = useCallback(async () => {
     try {
-      // 사용자가 행동했으므로 힌트 즉시 숨김
-      hideSwipeCue();
-
-      if (!videoRef.current) return;
-      const status = await videoRef.current.getStatusAsync();
-      if (!("isLoaded" in status) || !status.isLoaded) return;
-
-      if (isEnded) {
-        await videoRef.current.replayAsync();
-        setIsEnded(false);
-        return;
+      const snd = soundRef.current;
+      if (!snd) return;
+      const st = await snd.getStatusAsync();
+      if ("isLoaded" in st && st.isLoaded && st.isPlaying) {
+        await snd.stopAsync();
+        await snd.setPositionAsync(0);
+        setIsPlaying(false);
       }
-      if (status.isPlaying) {
-        await videoRef.current.pauseAsync();
-        return;
-      }
-      await videoRef.current.playAsync();
-    } catch {
-      Alert.alert("재생 오류", "영상을 재생할 수 없어요.");
+    } catch {}
+  }, []);
+
+  const onPressControl = async () => {
+    hideSwipeCue();
+
+    const hasVideo = !!(data?.videoLocal || data?.videoUrl);
+    const hasAudio = !!data?.audioUrl;
+
+    if (hasVideo) {
+      await stopAudioIfPlaying(); // 동시재생 방지
+      setOverlayVisible(true);
+      overlayOpacity.setValue(0);
+      overlayScale.setValue(0.96);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+        Animated.timing(overlayScale, { toValue: 1, duration: 260, useNativeDriver: true }),
+      ]).start(async () => {
+        try {
+          if (overlayVideoRef.current) {
+            const st = await overlayVideoRef.current.getStatusAsync();
+            if ("isLoaded" in st && st.isLoaded) {
+              await overlayVideoRef.current.replayAsync();
+            } else {
+              await overlayVideoRef.current.playAsync();
+            }
+          }
+        } catch {}
+      });
+      return;
     }
+
+    if (hasAudio && soundRef.current) {
+      try {
+        const st = await soundRef.current.getStatusAsync();
+        if ("isLoaded" in st && st.isLoaded) {
+          if (st.isPlaying) {
+            await soundRef.current.pauseAsync();
+            setIsPlaying(false);
+          } else {
+            await soundRef.current.playAsync();
+            setIsPlaying(true);
+          }
+        }
+      } catch (e) {
+        Alert.alert("오디오 오류", "음성을 재생할 수 없어요.");
+      }
+      return;
+    }
+
+    Alert.alert("재생할 미디어가 없어요");
   };
 
   const onLongPressControl = async () => {
     hideSwipeCue();
     try {
-      if (!videoRef.current) return;
-      const status = await videoRef.current.getStatusAsync();
-      if (!("isLoaded" in status) || !status.isLoaded) return;
-      await videoRef.current.setStatusAsync({ shouldPlay: false, positionMillis: 0 });
-      setIsEnded(false);
+      // 오디오 초기화
+      if (soundRef.current) {
+        const st = await soundRef.current.getStatusAsync();
+        if ("isLoaded" in st && st.isLoaded) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.setPositionAsync(0);
+          setIsPlaying(false);
+          setIsEnded(false);
+        }
+      }
+      // 오버레이 비디오 초기화 (열려있다면)
+      if (overlayVisible && overlayVideoRef.current) {
+        await overlayVideoRef.current.setStatusAsync({ shouldPlay: false, positionMillis: 0 });
+        setIsPlaying(false);
+        setIsEnded(false);
+      }
     } catch {}
   };
 
-  // ── 플립: 스와이프만 ─────────────────────────────────────────────────────
+  // ── 플립 & 스와이프 ──────────────────────────────────────────────────────
   const flipDeg = useRef(new Animated.Value(0)).current; // 0=앞, ±180=뒤
   const frontRotate = flipDeg.interpolate({
     inputRange: [-180, 0, 180],
@@ -325,15 +538,16 @@ export default function CardScreen() {
     }).start();
   };
 
+  const [bannerOpen, setBannerOpen] = useState(false);
   const SWIPE_THRESHOLD = 12;
+
   const swipeResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false, // 탭은 자식으로
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) =>
         !bannerOpen && Math.abs(g.dx) > Math.abs(g.dy) && Math.abs(g.dx) > SWIPE_THRESHOLD,
       onPanResponderMove: () => {},
       onPanResponderRelease: (_, g) => {
-        // 사용자 행동 → 힌트 숨김
         hideSwipeCue();
         if (bannerOpen) return;
         if (g.dx > SWIPE_THRESHOLD * 5) {
@@ -348,7 +562,6 @@ export default function CardScreen() {
   ).current;
 
   // ── 앞면 편지 배너 ───────────────────────────────────────────────────────
-  const [bannerOpen, setBannerOpen] = useState(false);
   const bannerTY = useRef(new Animated.Value(BANNER_MAX_H)).current;
 
   const stopRevealTimers = () => {
@@ -360,7 +573,6 @@ export default function CardScreen() {
     stopRevealTimers();
     setVisibleLineCount(0);
 
-    // 오디오가 있으면 오디오 길이, 없으면 비디오 길이(최소 4초)
     let totalMs = mediaDurationMs;
     if (!totalMs || totalMs < 1000) totalMs = Math.max(4000, mediaDurationMs);
 
@@ -404,39 +616,59 @@ export default function CardScreen() {
     [bannerTY, lines.length]
   );
 
-  // 배너 드래그 제스처
-  const bannerPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dy) > Math.abs(g.dx) && Math.abs(g.dy) > 6,
-      onPanResponderMove: (_, g) => {
-        // 사용자 행동 → 힌트 숨김
-        hideSwipeCue();
-        // 닫힘 기준(BANNER_MAX_H) + dy; 위로 올리면 dy 음수 → 0쪽으로 이동
-        const next = Math.min(BANNER_MAX_H, Math.max(0, BANNER_MAX_H + g.dy));
-        bannerTY.setValue(next);
-      },
-      onPanResponderRelease: (_, g) => {
-        const openedEnough = (BANNER_MAX_H + g.dy) < BANNER_MAX_H * 0.6 || g.vy < -0.8;
-        snapBanner(openedEnough);
-      },
-      onPanResponderTerminate: () => {
-        snapBanner(false, false);
-      },
-    })
-  ).current;
-
-  // lines가 늦게 로드되어도, 배너가 열려 있으면 자동 리빌
-  useEffect(() => {
-    if (bannerOpen && lines.length > 0) startReveal();
-  }, [lines.length, bannerOpen]);
+  // ✅ 배너 드래그 제스처 (정의 누락 보완)
+  const bannerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dy) > Math.abs(g.dx) && Math.abs(g.dy) > 6,
+        onPanResponderMove: (_, g) => {
+          hideSwipeCue();
+          const next = Math.min(BANNER_MAX_H, Math.max(0, BANNER_MAX_H + g.dy));
+          bannerTY.setValue(next);
+        },
+        onPanResponderRelease: (_, g) => {
+          const openedEnough =
+            BANNER_MAX_H + g.dy < BANNER_MAX_H * 0.6 || g.vy < -0.8;
+          snapBanner(openedEnough);
+        },
+        onPanResponderTerminate: () => {
+          snapBanner(false, false);
+        },
+      }),
+    [hideSwipeCue, snapBanner]
+  );
 
   // 소스
   const coverUri = data?.coverImageUrl ?? "https://via.placeholder.com/1200x1600.png?text=Poster";
   const nameForCaption = (to && String(to).trim()) || data?.recipientName || "";
-  const videoSource =
-    (data?.videoLocal as number | undefined) ?? (data?.videoUrl ? { uri: data.videoUrl } : undefined);
+
+  const videoSource: any =
+    (data?.videoLocal as number | undefined) ??
+    (data?.videoUrl ? { uri: data.videoUrl } : undefined);
+
+  const hasVideo = !!videoSource;
+  const hasAudioOnly = !hasVideo && !!data?.audioUrl;
+
+  // 오버레이 치수
+  const overlayDims = useMemo(() => {
+    const maxW = Math.min(Math.max(width - 24, 1280), 1280);
+    const maxH = Math.min(Math.max(height - 48, 720), 720);
+    if (overlayAspect && overlayAspect > 0) {
+      const byHeightW = Math.round(Math.min(maxW, Math.round(maxH * overlayAspect)));
+      const byHeightH = Math.round(Math.min(maxH, Math.round(byHeightW / overlayAspect)));
+      if (byHeightW <= maxW && byHeightH <= maxH) return { width: byHeightW, height: byHeightH };
+      const byWidthW = Math.round(Math.min(maxW, Math.round(maxW)));
+      const byWidthH = Math.round(Math.min(maxH, Math.round(byWidthW / overlayAspect)));
+      return { width: byWidthW, height: byWidthH };
+    }
+    const fallbackAspect = 16 / 9;
+    if (maxW / maxH > fallbackAspect) {
+      return { width: Math.round(maxH * fallbackAspect), height: maxH };
+    }
+    return { width: maxW, height: Math.round(maxW / fallbackAspect) };
+  }, [overlayAspect]);
 
   if (loading) {
     return (
@@ -474,50 +706,45 @@ export default function CardScreen() {
       >
         <Text style={styles.nextBtnText}>다음</Text>
       </Pressable>
-     
+
       {/* 카드(축 고정) — 스와이프 핸들러만 부착 */}
       <Animated.View style={[styles.cardShadowWrap, { opacity: mainOpacity }]} {...swipeResponder.panHandlers}>
         {/* 앞면 */}
         <Animated.View
-          style={[
-            styles.cardBase,
-            { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] },
-          ]}
+          style={[styles.cardBase, { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] }]}
         >
-          {/* 종이질감 */}
-          {/* <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} /> */}
-
           {/* 폴라로이드 묶음 */}
           <View style={styles.polaroidWrap}>
             <View style={styles.polaroidInner}>
               <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
+
+              {/* 사진/영상 영역 */}
               <View style={styles.photoArea}>
-              {/* <Image source={{ uri: coverUri }} style={styles.video} /> */}
-                {videoSource ? (
+                {hasVideo ? (
                   <Video
-                    ref={videoRef}
-                    source={videoSource as any}
-                    style={[styles.video, {position: "relative"}]}
+                    source={videoSource}
+                    style={styles.video}
                     resizeMode={ResizeMode.COVER}
-                    onPlaybackStatusUpdate={onStatusUpdate}
-                    // shouldPlay={false}
-                    // isLooping={false}
-                    // useNativeControls={false}
-                    // usePoster={false}
-                    // posterSource={{ uri: coverUri }}
-                    // posterStyle={styles.video}
+                    shouldPlay={false}
+                    isMuted
+                    usePoster
+                    posterSource={{ uri: coverUri }}
                   />
                 ) : (
-                  <Image source={{ uri: coverUri }} style={styles.video} />
+                  <Image source={{ uri: coverUri }} style={styles.pastedPhoto} />
                 )}
 
-                {/* 중앙 컨트롤 */}
+                {hasVideo && <View style={styles.previewBlack} pointerEvents="none" />}
+
+                {/* 중앙 컨트롤: 탭=재생, 롱탭=리셋 */}
                 <Pressable
                   onPress={onPressControl}
                   onLongPress={onLongPressControl}
                   delayLongPress={280}
                   style={styles.playHit}
-                  accessibilityLabel={isEnded ? "다시 재생" : isPlaying ? "일시정지" : "재생"}
+                  accessibilityLabel={
+                    isEnded ? "다시 재생" : isPlaying ? "일시정지" : hasVideo ? "영상 재생" : hasAudioOnly ? "음성 재생" : "재생"
+                  }
                 >
                   {!isPlaying && <View style={styles.playTriangle} />}
                 </Pressable>
@@ -537,10 +764,9 @@ export default function CardScreen() {
             </View>
           </View>
 
-          {/* ▶︎ 스와이프 힌트 (영상 종료 후 잠깐 노출) */}
+          {/* ▶︎ 스와이프 힌트 */}
           {showSwipeCue && (
             <Animated.View style={[styles.swipeCueWrap, { opacity: swipeCueOpacity }]}>
-              
               <Text style={styles.swipeCueText}>아래에서 위로 쓸어올려 편지보기</Text>
             </Animated.View>
           )}
@@ -568,10 +794,7 @@ export default function CardScreen() {
                     key={i}
                     style={[
                       styles.letterLineBack,
-                      {
-                        opacity: show ? (anim?.opacity ?? 0) : 0,
-                        transform: [{ translateY: show ? (anim?.ty ?? 8) : 8 }],
-                      },
+                      { opacity: show ? (anim?.opacity ?? 0) : 0, transform: [{ translateY: show ? (anim?.ty ?? 8) : 8 }] },
                     ]}
                   >
                     {line === "" ? " " : line}
@@ -584,11 +807,7 @@ export default function CardScreen() {
 
         {/* 뒷면 */}
         <Animated.View
-          style={[
-            styles.cardBase,
-            styles.cardBack,
-            { transform: [{ perspective: 1200 }, { rotateY: backRotate }] },
-          ]}
+          style={[styles.cardBase, styles.cardBack, { transform: [{ perspective: 1200 }, { rotateY: backRotate }] }]}
         >
           <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} />
           <View style={styles.backHeader}>
@@ -603,6 +822,50 @@ export default function CardScreen() {
           </View>
         </Animated.View>
       </Animated.View>
+
+      {/* 오버레이 비디오 플레이어 */}
+      {overlayVisible && (
+        <Animated.View style={[styles.overlayWrap, { opacity: overlayOpacity }]} pointerEvents={overlayVisible ? "auto" : "none"}>
+          <Animated.View style={styles.overlayBg}>
+            <Pressable style={styles.overlayBg} onPress={onCloseOverlay} />
+          </Animated.View>
+          <Animated.View style={[styles.overlayContent, { transform: [{ scale: overlayScale }] }]}>
+            {(() => {
+              const maxW = Math.min(width * 0.92, 1280);
+              const maxH = Math.min(height * 0.8, 720);
+              let w = overlayDims.width;
+              let h = overlayDims.height;
+              if (overlaySize) {
+                const aspect = overlaySize.width / overlaySize.height;
+                if (overlaySize.width <= maxW && overlaySize.height <= maxH) {
+                  w = overlaySize.width;
+                  h = overlaySize.height;
+                } else if (maxW / maxH > aspect) {
+                  h = maxH;
+                  w = Math.round(h * aspect);
+                } else {
+                  w = maxW;
+                  h = Math.round(w / aspect);
+                }
+              }
+              return (
+                <View style={{ width: maxW, height: maxH, alignItems: "center", justifyContent: "center" }}>
+                  <Video
+                    ref={overlayVideoRef}
+                    source={videoSource as any}
+                    style={{ width: w, height: h, borderRadius: 8, backgroundColor: "#000" }}
+                    resizeMode={ResizeMode.CONTAIN}
+                    onPlaybackStatusUpdate={onOverlayStatusUpdate}
+                    shouldPlay
+                    isLooping={false}
+                    useNativeControls
+                  />
+                </View>
+              );
+            })()}
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -630,7 +893,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   cardBase: {
-    position: "relative",
+    position: "absolute",
     width: "100%",
     height: "100%",
     backgroundColor: "#FFFFFF",
@@ -653,14 +916,14 @@ const styles = StyleSheet.create({
     resizeMode: "repeat" as any,
     pointerEvents: "none",
   },
-
-  // 앞면 콘텐츠
-  polaroidWrap: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    paddingTop: 8,
+  previewBlack: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    opacity: 1,
+    zIndex: 10,
   },
+  // 앞면 콘텐츠
+  polaroidWrap: { width: "100%", alignItems: "center", paddingTop: 8 },
   polaroidInner: {
     width: "100%",
     backgroundColor: "#fff",
@@ -694,14 +957,23 @@ const styles = StyleSheet.create({
     borderColor: "#FFF",
     transform: [{ rotate: "-0.2deg" }],
   },
-  //video: {height: "100%"},//{ width: "", height: "100%", position: "relative"},
   video: {
-    ...StyleSheet.absoluteFillObject, // 부모 영역 완전히 채움
+    ...StyleSheet.absoluteFillObject,
     width: "100%",
     height: "100%",
     position: "relative",
   },
-
+  pastedPhoto: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    resizeMode: "cover",
+    zIndex: 70,
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
   playHit: {
     position: "absolute",
     top: "50%",
@@ -712,6 +984,8 @@ const styles = StyleSheet.create({
     marginTop: -43,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 90,
+    elevation: 90,
   },
   playTriangle: {
     width: 0,
@@ -721,7 +995,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 32,
     borderTopColor: "transparent",
     borderBottomColor: "transparent",
-    borderLeftColor: "#9CA3AF",
+    borderLeftColor: "#FFFFFF",
     marginLeft: 6,
   },
 
@@ -761,16 +1035,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#1F2937",
     fontWeight: "700",
-  },
-  swipeArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 14,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderBottomColor: "#9CA3AF", // 위로 향하는 작은 화살표
   },
 
   // 편지 배너
@@ -847,5 +1111,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 6,
   },
-});
 
+  // 오버레이 영상 
+  overlayWrap: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  overlayBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  overlayContent: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    zIndex: 1000,
+  },
+});

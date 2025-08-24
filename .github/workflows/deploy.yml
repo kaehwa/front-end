@@ -36,7 +36,7 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          source: "gaehwa-web/out/*"
+          source: ".next/*"
           target: "/var/www/expogo"
 
       - name: Reload nginx

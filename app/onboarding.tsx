@@ -127,7 +127,7 @@ export default function Onboarding() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#EAF4FF" },
+  container: { flex: 1, backgroundColor: "#FEF2CC" },
   // 단비 이미지
   danbi: {
     width: 300,   // ← 원하는 크기 숫자로 바꿔주면 됨

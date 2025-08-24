@@ -27,6 +27,16 @@ const CARD_H = Math.min(620, Math.round(height * 0.8));
 const PHOTO_H = Math.round(CARD_W * 0.9);
 const PAGE_BG = "#F5EFE3";
 const BANNER_MAX_H = Math.min(Math.round(CARD_H * 0.65), 420);
+const { id } = useLocalSearchParams<{ id?: string }>();
+const stableId = String(id ?? "preview");
+
+// ── 카카오톡 공유 ───────────────────────────────────────────────────────────
+const BASE_URL = __DEV__
+  ? "https://f77e2967d1e4.ngrok-free.app"   // 개발: ngrok
+  : "https://gaehwa.app";                    // 운영: 정식 도메인
+
+const inviteUrl = `${BASE_URL}/invite/${stableId}`;
+const imageUrl  = `${BASE_URL}/og/${stableId}`; // 또는 `${BASE_URL}/static/danbi.png`
 
 // ── 종이 텍스처 ─────────────────────────────────────────────────────────────
 const PAPER_TEXTURE =
@@ -35,7 +45,7 @@ const PAPER_TEXTURE =
 // ── 로컬 리소스 ─────────────────────────────────────────────────────────────
 const LOCAL_VIDEO = require("../assets/videos/file.mp4");
 const CORNER_TAPE = require("../assets/images/tape.png");
-
+const BOUQUET_GIF = require("../assets/videos/file.gif");
 // ── 타입 ────────────────────────────────────────────────────────────────────
 type CardPayload = {
   id: string;
@@ -60,8 +70,13 @@ function formatKoDate(d = new Date()) {
 const BACKEND_URL = "http://4.240.103.29:8080";
 
 export default function CardScreen() {
-  const { orderID, to } = useLocalSearchParams<{ orderID?: string; to?: string }>();
+  const { orderID, to,bg } = useLocalSearchParams<{ orderID?: string; to?: string; bg?: string }>();
   const insets = useSafeAreaInsets();
+
+  const pageBg = useMemo(
+  () => (typeof bg === "string" && bg.trim().length > 0 ? bg : PAGE_BG),
+  [bg]
+);
 
   // ── 인트로(봉투) ─────────────────────────────────────────────────────────
   const [showIntro, setShowIntro] = useState(true);
@@ -673,14 +688,14 @@ export default function CardScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.page, { justifyContent: "center", alignItems: "center" }]}>
+      <View style={[styles.page, { justifyContent: "center", alignItems: "center", backgroundColor: pageBg }]}>
         <Text style={{ color: "#666" }}>카드를 준비하고 있어요…</Text>
       </View>
     );
   }
   if (err) {
     return (
-      <View style={[styles.page, { justifyContent: "center", alignItems: "center" }]}>
+      <View style={[styles.page, { justifyContent: "center", alignItems: "center", backgroundColor: pageBg }]}>
         <Text style={{ color: "#b91c1c", textAlign: "center" }}>{err}</Text>
       </View>
     );
@@ -688,7 +703,7 @@ export default function CardScreen() {
   if (!data) return null;
 
   return (
-    <View style={[styles.page, { paddingTop: Math.max(insets.top, 16) }]}>
+    <View style={[styles.page, { paddingTop: Math.max(insets.top, 16), backgroundColor: pageBg }]}>
       {/* 인트로 봉투 */}
       {showIntro && (
         <EnvelopeOverlay
@@ -701,7 +716,10 @@ export default function CardScreen() {
       <Pressable
         style={[styles.nextBtn, { top: 8, right: 12 }]}
         onPress={() =>
-          router.push({ pathname: "/paymentConfirm", params: { id: String(stableId), to: nameForCaption } })
+          router.push({ pathname: "/share", params: { id: String(stableId), to: nameForCaption, title: "꽃카드가 도착했어요!",
+    text: "선아님이 보낸 꽃카드가 도착했어요! 확인해보시겠어요?",
+    url: inviteUrl,
+    image: imageUrl, } })
         }
         accessibilityLabel="다음"
       >
@@ -811,16 +829,21 @@ export default function CardScreen() {
           style={[styles.cardBase, styles.cardBack, { transform: [{ perspective: 1200 }, { rotateY: backRotate }] }]}
         >
           <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} />
-          <View style={styles.backHeader}>
-            <Text style={styles.backTitle}>뒷면</Text>
-            <Pressable onPress={() => animateFlipTo(0)} style={styles.backFlipBtn}>
-              <Text style={styles.backFlipText}>앞면</Text>
-            </Pressable>
-          </View>
+           
+          
+          <View style={[styles.backBody, { alignItems: "center" }]}>
+  {/* 위쪽 스페이서 */}
+  <View style={{ flex: 1 }} />
 
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: "#6b7280" }}>여기에 추후 콘텐츠를 넣어보자(예: 추천 꽃 정보 등)</Text>
-          </View>
+  {/* 중앙에 올 블록 (이미지 + 캡션) */}
+  <View style={{ alignItems: "center" }}>
+    <Image source={BOUQUET_GIF} style={styles.bouquetGif} resizeMode="contain" />
+    <Text style={styles.bouquetCaption}>꽃다발 미리보기</Text>
+  </View>
+
+  {/* 아래쪽 스페이서 */}
+  <View style={{ flex: 1 }} />
+</View>
         </Animated.View>
       </Animated.View>
 
@@ -1088,21 +1111,30 @@ const styles = StyleSheet.create({
   bannerCloseText: { fontSize: 12, fontWeight: "700", color: "#111827" },
 
   // 뒷면 헤더
-  backHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 8,
-  },
-  backTitle: { fontSize: 16, fontWeight: "800", color: "#1F2937" },
-  backFlipBtn: {
-    backgroundColor: "rgba(0,0,0,0.06)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
   backFlipText: { color: "#111827", fontWeight: "700", fontSize: 12 },
 
+  // (이건 GIF용 추가 스타일)
+  backBody: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  bouquetGif: {
+    width: "100000%",
+    left: -20,
+    marginTop: -10,       // 필요하면 숫자 조절
+    height: Math.round(PHOTO_H * 0.9),
+    borderRadius: 8,
+    backgroundColor: "transparent",
+  },
+  bouquetCaption: {
+    marginTop: 50,
+    fontSize: 13,
+    color: "#6b7280",
+    fontWeight: "700",
+  },
+   
   // 편지 텍스트
   letterScroll: { paddingTop: 8, paddingBottom: 12, paddingHorizontal: 12 },
   letterLineBack: {

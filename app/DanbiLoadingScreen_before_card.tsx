@@ -1,67 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, Image, Pressable, Animated, Easing, Dimensions,
+  View, Text, StyleSheet, Image, Animated, Easing, Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router"
 
 const { width } = Dimensions.get("window");
 const BRAND_BG = "#FFF2CC";
 const BRAND_ACCENT = "#FB7431";
 const BRAND_MUTE = "#7A958E";
 
+// ✅ 실제 준비 상태를 확인할 대상 URL (필요 시 변경)
+const TARGET_URL = "http://localhost:8081/card?orderID=25";
+
+// 로컬 GIF (경로는 프로젝트 구조에 맞게 조정)
+const DANBI_GIF = require("../assets/mascot/danbi_loading.gif");
+
 /** props
- * expectedReadyAt: 결과 준비 예정 시각(ISO). 없으면 60분 카운트다운.
  * mode: 'promo' | 'work' | 'none'  → 단비 악세사리 테마
  */
-export default function DanbiLoadingScreen() {
-  const mode = "promo"
-
-  // 1) 타이머/프로그레스 --------------------------
-  const now = Date.now();
-  const defaultEnd = now + 60 * 10 * 1000; // 기본 60분
-  const endTs = defaultEnd
-
-  const BACKEND_URL = "http://4.240.103.29:8080"
-  const { orderID } = useLocalSearchParams<{ orderID: string }>();
-  console.log(orderID)
-
-  useEffect(() => {
-    console.log(`orderID : ${orderID}`)
-    const sendMessage = async () => {
-      try {
-        // 1️⃣ PATCH 요청
-        console.log(`post url : ${BACKEND_URL}/flowers/${orderID}/medialetter`)
-        const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/medialetter`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: orderID }),
-        });
-
-        // const data = await res.json();
-        console.log("POST 결과:", res);
-        router.push({ pathname: "/card", params: { orderID: orderID ?? "" } });
-
-        // 2️⃣ PATCH 완료 후 다음 페이지 이동
-      } catch (err) {
-        console.log("POST 실패:", err);
-      }
-    };
-    if (orderID) {
-      sendMessage();
-    }
-  }, [orderID]);
-
-  const [nowTs, setNowTs] = useState(now);
-  useEffect(() => {
-    const t = setInterval(() => setNowTs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const remainMs = Math.max(endTs - nowTs, 0);
-  const progress = 1 - remainMs / (endTs - now); // 0~1
-  const { mm, ss } = msToMMSS(remainMs);
-
-  // 2) 단비 모션(바운스+살짝 흔들림) ----------------
+export default function DanbiLoadingScreen({
+  mode = "promo",
+}: {
+  mode?: "promo" | "work" | "none";
+}) {
+  // ──────────────────────────────────────────────
+  // 1) 단비 모션(바운스+살짝 흔들림)
+  // ──────────────────────────────────────────────
   const bob = useRef(new Animated.Value(0)).current;
   const tilt = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -80,16 +44,22 @@ export default function DanbiLoadingScreen() {
     bobAnim.start(); tiltAnim.start();
     return () => { bobAnim.stop(); tiltAnim.stop(); };
   }, [bob, tilt]);
+  const rotate = tilt.interpolate({ inputRange: [-1, 1], outputRange: ["-4deg", "4deg"] });
 
-  // 3) 진행 바 애니메이션 --------------------------
+  // ──────────────────────────────────────────────
+  // 2) 실제 준비 상태 폴링 + 진행률 표시
+  //    - 준비 전: 95%까지 점진 증가(초반 빠르게 → 후반 느리게)
+  //    - 준비 감지: 100%까지 채움
+  // ──────────────────────────────────────────────
+  const [isReady, setIsReady] = useState(false);
+  const [progress, setProgress] = useState(0); // 0.0 ~ 1.0
+
+  // 바 너비 애니메이션 값
   const barW = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(barW, { toValue: progress, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [progress, barW]);
-
   const barOuterW = Math.min(480, width - 48);
 
-  // 4) 텍스트 스니펫(마이크로카피) ----------------
+  // 진행률 숫자/스니펫
+  const currentPercent = Math.round(progress * 100);
   const lines = useMemo(() => {
     if (progress < 0.25) return ["단비가 꽃잎을 모으는 중이에요", "조금만 기다려 주세요."];
     if (progress < 0.5)  return ["꽃향기를 고르고 있어요", "좀 더 포근하게 만들게요."];
@@ -97,48 +67,89 @@ export default function DanbiLoadingScreen() {
     return ["마무리 다듬는 중이에요", "곧 완성됩니다!"];
   }, [progress]);
 
-  // 5) 액세서리(👓/👔/🛠️ 등) -----------------------
-  const accessories = (
-    <>
-      {mode === "promo" && (
-        <>
-          <Text style={[styles.emoji, { top: 36, left: 92, fontSize: 22 }]}>👓</Text>
-          <Text style={[styles.emoji, { top: 124, left: 104, fontSize: 22 }]}>👔</Text>
-        </>
-      )}
-      {mode === "work" && (
-        <>
-          <Text style={[styles.emoji, { top: 14, left: 128, fontSize: 20 }]}>🧢</Text>
-          <Text style={[styles.emoji, { top: 124, left: 118, fontSize: 20 }]}>🛠️</Text>
-        </>
-      )}
-    </>
-  );
+  // 바 너비 애니메이션 반영
+  useEffect(() => {
+    Animated.timing(barW, {
+      toValue: progress,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
 
-  const rotate = tilt.interpolate({ inputRange: [-1, 1], outputRange: ["-4deg", "4deg"] });
-  const currentPercent = Math.round(progress * 100);
+  // % 증가 루프 (준비 전: 95%까지 / 준비 후: 100%까지)
+  useEffect(() => {
+    let mounted = true;
+    const tick = () => {
+      setProgress(prev => {
+        if (!mounted) return prev;
+        if (isReady) {
+          // 준비되면 부드럽게 100%로
+          return Math.min(prev + 0.05, 1);
+        } else {
+          // 준비 전: 초반 빠르게, 후반 느리게, 최대 0.95
+          const cap = 0.95;
+          const inc = prev < 0.6 ? 0.025 : prev < 0.85 ? 0.012 : 0.004;
+          return Math.min(prev + inc, cap);
+        }
+      });
+    };
+    const t = setInterval(tick, 150);
+    return () => { mounted = false; clearInterval(t); };
+  }, [isReady]);
+
+  // 준비 상태 폴링 (HEAD → 실패 시 GET)
+  useEffect(() => {
+    let active = true;
+
+    const checkUrlReachable = async (url: string, timeoutMs = 2500) => {
+      const withTimeout = (p: Promise<Response>) =>
+        Promise.race([
+          p,
+          new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
+        ]);
+
+      try {
+        const resHead = await withTimeout(fetch(url, { method: "HEAD" } as any));
+        if (resHead && resHead.ok) return true;
+      } catch (_) { /* noop */ }
+
+      try {
+        const resGet = await withTimeout(fetch(url));
+        return !!resGet && resGet.ok;
+      } catch (_) {
+        return false;
+      }
+    };
+
+    const loop = async () => {
+      while (active && !isReady) {
+        const ok = await checkUrlReachable(TARGET_URL, 2500);
+        if (!active) break;
+        if (ok) {
+          setIsReady(true);
+          break;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    };
+
+    loop();
+    return () => { active = false; };
+  }, [isReady]);
 
   return (
     <View style={styles.page}>
-      {/* 헤더 */}
+      {/* 헤더 (1시간 문구 제거) */}
       <View style={styles.header}>
         <Text style={styles.title}>단비가 정성껏 준비 중…</Text>
-        <Text style={styles.sub}>약 1시간 내에 결과가 완성돼요.</Text>
+        <Text style={styles.sub}>필요한 파일을 준비하고 있어요.</Text>
       </View>
 
-      {/* 단비 일러스트 */}
-      <Animated.View style={{ transform: [{ translateY: bob }, { rotate: rotate }] }}>
-        <View style={styles.danbiWrap}>
-          <Image
-            source={{ uri: "https://picsum.photos/seed/danbi/360/360" }} // TODO: 단비 PNG로 교체
-            style={styles.danbi}
-            resizeMode="contain"
-          />
-          {accessories}
-          <View style={styles.badge}>
-            <Ionicons name="time-outline" size={13} color="#fff" />
-            <Text style={styles.badgeText}>{mm}:{ss}</Text>
-          </View>
+      {/* 단비 일러스트 (GIF) */}
+      <Animated.View style={{ transform: [{ translateY: bob }, { rotate }] }}>
+        <View >
+          <Image source={DANBI_GIF} style={styles.danbi} resizeMode="contain" />
         </View>
       </Animated.View>
 
@@ -148,34 +159,28 @@ export default function DanbiLoadingScreen() {
         <Text style={styles.lineSecondary}>{lines[1]}</Text>
       </View>
 
-      {/* 진행률 바 */}
+      {/* 진행률 바 + % */}
       <View style={[styles.barOuter, { width: barOuterW }]}>
-        <Animated.View style={[styles.barInner, { width: barW.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, barOuterW],
-        }) }]} />
+        <Animated.View
+          style={[
+            styles.barInner,
+            {
+              width: barW.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, barOuterW],
+              }),
+            },
+          ]}
+        />
       </View>
       <Text style={styles.percent}>{currentPercent}%</Text>
 
-      {/* 마일스톤 */}
+      {/* 마일스톤: 25/50/75/100%에서 불 켜짐 */}
       <View style={styles.milestones}>
         <Milestone label="분석" done={progress >= 0.25} />
-        <Milestone label="조합" done={progress >= 0.5} />
+        <Milestone label="조합" done={progress >= 0.50} />
         <Milestone label="다듬기" done={progress >= 0.75} />
-        <Milestone label="완성" done={progress >= 0.99} />
-      </View>
-
-      {/* 하단 액션 */}
-      <View style={styles.actions}>
-        <Pressable style={[styles.btn, styles.btnGhost]} > 
-          {/* onPress={onCancel}> */}
-          <Ionicons name="home-outline" size={18} color={BRAND_ACCENT} />
-          <Text style={styles.btnGhostText}>홈으로</Text>
-        </Pressable>
-        <Pressable style={[styles.btn, styles.btnPrimary]}>
-          <Ionicons name="notifications-outline" size={18} color="#fff" />
-          <Text style={styles.btnPrimaryText}>완성 알림 받기</Text>
-        </Pressable>
+        <Milestone label="완성" done={progress >= 1.00} />
       </View>
     </View>
   );
@@ -190,13 +195,6 @@ function Milestone({ label, done }: { label: string; done: boolean }) {
   );
 }
 
-function msToMMSS(ms: number) {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return { mm: String(m).padStart(2, "0"), ss: String(s).padStart(2, "0") };
-}
-
 /* ---------------- Styles ---------------- */
 const styles = StyleSheet.create({
   page: { flex: 1, paddingTop: 32, alignItems: "center", backgroundColor: BRAND_BG },
@@ -204,18 +202,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: "800", color: "#222" },
   sub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
 
-  danbiWrap: {
-    width: 200, height: 200, borderRadius: 24, backgroundColor: "#fff",
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
-  },
-  danbi: { width: 160, height: 160 },
+ 
+  danbi: { width: 300, height: 300 },
   emoji: { position: "absolute" },
-  badge: {
-    position: "absolute", bottom: 10, right: 10, backgroundColor: BRAND_ACCENT,
-    paddingHorizontal: 8, paddingVertical: 6, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 6,
-  },
-  badgeText: { color: "#fff", fontWeight: "800", fontSize: 12 },
 
   linePrimary: { fontSize: 16, color: "#27333a", marginBottom: 2 },
   lineSecondary: { fontSize: 13, color: BRAND_MUTE },
@@ -229,12 +218,6 @@ const styles = StyleSheet.create({
   percent: { marginTop: 6, color: "#374151", fontWeight: "700" },
 
   milestones: { flexDirection: "row", gap: 18, marginTop: 10 },
-  actions: { flexDirection: "row", gap: 10, marginTop: 18 },
-  btn: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 999 },
-  btnPrimary: { backgroundColor: BRAND_ACCENT },
-  btnPrimaryText: { color: "#fff", fontWeight: "800" },
-  btnGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: BRAND_ACCENT },
-  btnGhostText: { color: BRAND_ACCENT, fontWeight: "800" },
 });
 
 const ms = StyleSheet.create({

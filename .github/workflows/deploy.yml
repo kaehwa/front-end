@@ -11,7 +11,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: gaehwa-web   # 웹 코드 위치 지정
+        working-directory: gaehwa-web
 
     steps:
       - name: Checkout repository
@@ -27,8 +27,9 @@ jobs:
 
       - name: Build Next.js
         run: npm run build -- --no-lint
-        # 필요하면 export는 나중에 추가
-        # run: npm run export
+
+      - name: Verify build output
+        run: ls -la .next
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@master
@@ -36,9 +37,14 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          source: ".next/*"
+          source: |
+            .next/
+            public/
+            package.json
+            package-lock.json
+            next.config.js
           target: "/var/www/expogo"
-          strip_components: 1
+          strip_components: 0
           overwrite: true
 
       - name: Reload nginx

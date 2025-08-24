@@ -9,10 +9,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: gaehwa-web   # 웹 코드 위치
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -24,9 +20,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install --force
+        working-directory: gaehwa-web
 
       - name: Build Next.js
         run: npm run build -- --no-lint
+        working-directory: gaehwa-web
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
@@ -35,23 +33,13 @@ jobs:
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           source: |
-            .next
-            package.json
-            package-lock.json
-            next.config.js
-            public
-          target: "/var/www/expogo"
-
-      - name: Install production dependencies & run Next.js
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.AZURE_HOST }}
-          username: ${{ secrets.AZURE_USER }}
-          key: ${{ secrets.AZURE_SSH_KEY }}
-          script: |
-            cd /var/www/expogo
-            npm install --production
-            pm2 restart expogo || pm2 start npm --name "expogo" -- start
+            gaehwa-web/.next
+            gaehwa-web/public
+            gaehwa-web/package.json
+            gaehwa-web/package-lock.json
+            gaehwa-web/next.config.js
+          target: /var/www/expogo
+          strip_components: 1  # 불필요한 상위 디렉토리 제거
 
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7

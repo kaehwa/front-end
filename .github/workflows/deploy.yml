@@ -11,7 +11,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: gaehwa-web   # 웹 코드 위치
+        working-directory: gaehwa-web   # 웹 코드 위치 지정
 
     steps:
       - name: Checkout repository
@@ -26,23 +26,23 @@ jobs:
         run: npm install --force
 
       - name: Build Next.js
-        run: |
-          npm run build -- --no-lint
-          # npm run export   # 필요 시 out/ 폴더 생성
+        run: npm run build -- --no-lint
+        # 필요하면 export는 나중에 추가
+        # run: npm run export
 
       - name: Deploy to Azure VM
-        uses: appleboy/scp-action@v0.1.8   # 최신 안정 버전
+        uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          source: ".next/**/*"   # 재귀적으로 모든 파일 포함
+          source: ".next/*"
           target: "/var/www/expogo"
-          strip_components: 0
+          strip_components: 1
           overwrite: true
 
       - name: Reload nginx
-        uses: appleboy/ssh-action@v0.1.8   # 최신 안정 버전
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}

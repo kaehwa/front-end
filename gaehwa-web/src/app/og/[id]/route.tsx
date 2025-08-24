@@ -1,14 +1,12 @@
 // app/og/[id]/route.tsx
-import { ImageResponse } from "next/og"; // next/og 사용
+import { ImageResponse } from "next/og";
+import { NextRequest } from "next/server";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 
-export async function GET(
-  _: Request,
-  { params }: { params: { id: string } } // params는 Promise가 아님
-) {
-  const { id } = params;
+export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params; // Promise 풀기
   const title = "꽃카드가 도착했어요! 🌸";
   const desc  = "선아님이 보낸 꽃카드를 확인해보세요.";
   const danbi = "https://gaehwa.app/static/danbi.png";

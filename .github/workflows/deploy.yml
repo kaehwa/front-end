@@ -9,6 +9,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: gaehwa-web
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -19,17 +23,13 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: |
-          cd gaehwa-web
-          npm install --force
+        run: npm install --force
 
       - name: Build Next.js
-        run: |
-          cd gaehwa-web
-          npm run build -- --no-lint
+        run: npm run build -- --no-lint
 
-      - name: Check .next folder
-        run: ls -la gaehwa-web/.next
+      - name: Verify build output
+        run: ls -la .next
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
@@ -38,12 +38,14 @@ jobs:
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           source: |
-            gaehwa-web/.next/
-            gaehwa-web/public/
-            gaehwa-web/package.json
-            gaehwa-web/package-lock.json
-            gaehwa-web/next.config.js
+            .next/
+            public/
+            package.json
+            package-lock.json
+            next.config.js
           target: "/var/www/expogo"
+          strip_components: 0
+          overwrite: true
 
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7

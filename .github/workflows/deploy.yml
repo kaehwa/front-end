@@ -28,7 +28,7 @@ jobs:
       - name: Build Next.js (Export)
         run: |
           npm run build -- --no-lint
-          npm run export   # 👉 out/ 폴더 생김
+          #npm run export   # 👉 out/ 폴더 생김
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7

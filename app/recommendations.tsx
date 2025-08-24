@@ -190,7 +190,8 @@ export default function Recommendations() {
         console.log(e);
       }
       //////////////////////////////////////////////////////////////////////////////
-  
+    const bg = pickLightestFromPalette(item.palette, "#F5EFE3");
+
     router.push({
       pathname: "/confirm",
       params: {
@@ -199,7 +200,7 @@ export default function Recommendations() {
         title: item.title ?? "",
         localKey: item.imageLocal ?? "",
         imageUrl: item.imageUrl ? encodeURIComponent(item.imageUrl) : "",
-        palette: JSON.stringify(item.palette ?? []),
+        palette: JSON.stringify(item.palette ?? []),bg,
       },
     });
   };
@@ -301,6 +302,7 @@ export default function Recommendations() {
   );
 }
 
+
 // ── Card ─────────────────────────────────────────────────────────
 function Card({
   item,
@@ -393,6 +395,87 @@ function Card({
       </View>
     </Pressable>
   );
+}
+
+/** ---- Color utils: pick lightest from backend palette ---- */
+const HEX_RE = /^#?([a-f\d]{3}|[a-f\d]{6})$/i;
+
+function hexToRgbAny(hex: string) {
+  const m = String(hex).trim().match(HEX_RE);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map(x => x + x).join("");
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
+}
+function parseRgb(str: string) {
+  const m = String(str).trim().match(/^rgba?\(([^)]+)\)$/i);
+  if (!m) return null;
+  const parts = m[1].split(",").map(s => s.trim());
+  if (parts.length < 3) return null;
+  const r = parseFloat(parts[0]);
+  const g = parseFloat(parts[1]);
+  const b = parseFloat(parts[2]);
+  const a = parts[3] !== undefined ? parseFloat(parts[3]) : 1;
+  if ([r,g,b].some(v => Number.isNaN(v))) return null;
+  return { r, g, b, a };
+}
+function hslToRgb(h:number, s:number, l:number){
+  const c = (1 - Math.abs(2*l - 1)) * s;
+  const hp = h / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  let [r,g,b] = [0,0,0];
+  if (0<=hp && hp<1) [r,g,b]=[c,x,0];
+  else if (1<=hp && hp<2) [r,g,b]=[x,c,0];
+  else if (2<=hp && hp<3) [r,g,b]=[0,c,x];
+  else if (3<=hp && hp<4) [r,g,b]=[0,x,c];
+  else if (4<=hp && hp<5) [r,g,b]=[x,0,c];
+  else if (5<=hp && hp<6) [r,g,b]=[c,0,x];
+  const m = l - c/2;
+  return { r:(r+m)*255, g:(g+m)*255, b:(b+m)*255 };
+}
+function parseHsl(str:string){
+  const m = String(str).trim().match(/^hsla?\(([^)]+)\)$/i);
+  if (!m) return null;
+  const parts = m[1].split(",").map(s => s.trim().replace("%",""));
+  if (parts.length < 3) return null;
+  const h = parseFloat(parts[0]);
+  const s = parseFloat(parts[1]) / 100;
+  const l = parseFloat(parts[2]) / 100;
+  const a = parts[3] !== undefined ? parseFloat(parts[3]) : 1;
+  if ([h,s,l].some(v => Number.isNaN(v))) return null;
+  const {r,g,b} = hslToRgb(h,s,l);
+  return { r, g, b, a };
+}
+function parseColorAny(c:string){
+  return hexToRgbAny(c) || parseRgb(c) || parseHsl(c);
+}
+function compositeOnWhite({r,g,b,a=1}:{r:number,g:number,b:number,a?:number}){
+  const A = Math.max(0, Math.min(1, a));
+  return {
+    r: Math.round(r* A + 255*(1-A)),
+    g: Math.round(g* A + 255*(1-A)),
+    b: Math.round(b* A + 255*(1-A)),
+  };
+}
+function srgbToLin(v:number){ v/=255; return v<=0.04045 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }
+function luminanceRGB({r,g,b}:{r:number,g:number,b:number}){
+  const R=srgbToLin(r), G=srgbToLin(g), B=srgbToLin(b);
+  return 0.2126*R + 0.7152*G + 0.0722*B;
+}
+/** item.palette(백엔드)에서 가장 밝은 색 선택 */
+function pickLightestFromPalette(palette?: string[], fallback="#F5EFE3"){
+  const list = Array.isArray(palette) ? palette : [];
+  if (list.length === 0) return fallback;
+  let best = { col: fallback, lum: -1 };
+  for (const c of list){
+    const parsed = parseColorAny(c);
+    if (!parsed) continue;
+    const rgb = compositeOnWhite(parsed); // rgba도 흰배경으로 합성
+    const L = luminanceRGB(rgb);
+    if (L > best.lum) best = { col: c, lum: L };
+  }
+  return best.lum >= 0 ? best.col : fallback;
 }
 
 // ── Styles ───────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ export const contentType = "image/png";
 export const size = { width: 1200, height: 630 };
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const id = params.id;
+  const { id } = params;
   const title = "꽃카드가 도착했어요! 🌸";
   const desc  = "선아님이 보낸 꽃카드를 확인해보세요.";
   const danbi = "https://gaehwa.app/static/danbi.png"; // 공개 이미지

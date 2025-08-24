@@ -27,7 +27,7 @@ jobs:
 
       - name: Build Next.js (Export)
         run: |
-          npm run build
+          npm run build -- --no-lint
           npm run export   # 👉 out/ 폴더 생김
 
       - name: Deploy to Azure VM

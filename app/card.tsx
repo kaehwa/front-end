@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Video, ResizeMode, AVPlaybackStatusSuccess, Audio } from "expo-av";
 import EnvelopeOverlay from "../app/EnvelopeOverlay";
 import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system";
 
 // ── 화면/카드 치수 ───────────────────────────────────────────────────────────
 const { width, height } = Dimensions.get("window");
@@ -265,7 +266,7 @@ export default function CardScreen() {
 
   // 직접 블롭 접근이 실패(409 PublicAccessNotPermitted)하거나 네트워크/CORS 오류가 발생하면
   // 로컬 프록시 엔드포인트로 폴백합니다(블롭을 스트리밍).
-      const PROXY_BASE = "http://localhost:3000";
+    const PROXY_BASE = "http://localhost:3000";
     const resolveWithProxy = async (u?: string | null): Promise<string | null> => {
         if (!u) return null;
         try {
@@ -752,7 +753,7 @@ export default function CardScreen() {
 
               <View style={styles.bottomCaption}>
                 <Text style={styles.bottomCaptionText}>
-                  {formatKoDate()} 사랑하는 000 {nameForCaption}에게
+                  전하고싶은 소중한 순간을 버튼을 눌러 확인해요!
                 </Text>
               </View>
 

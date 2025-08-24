@@ -23,10 +23,10 @@ export default function OnboardingChat() {
     { type: "user", text: "그 다음은요?" },
     { type: "danbi", text: "상황과 이야기를 담아주세요 – 생일, 축하, 위로, 추억" },
     { type: "user", text: "AI는 뭘 해주나요?" },
-    { type: "danbi", text: "AI가 마음에 어울리는 꽃과 디자인을 추천하고,\n당신의 사진과 목소리를 담은 디지털 카드를 완성해 드려요." },
-    { type: "user", text: "실물도 받을 수 있나요?" },
-    { type: "danbi", text: "네, 제휴 플로리스트가 실물 꽃다발로 제작해 사랑하는 이의 손에 전해드립니다." },
-    { type: "danbi", text: "오늘, 당신의 이야기를 꽃으로 남겨보세요." },
+    { type: "danbi", text: "AI가 마음에 어울리는 꽃과 디자인을 추천하고,\n영상과 목소리를 담은 디지털 카드를 완성해 드려요." },
+    { type: "user", text: "어떻게 받나요?" },
+    { type: "danbi", text: "입력을 하신 후 약 10분 정도 시간이 지나면 단비가 알람을 보내드려요! 또한 공유하기를 통해 편하게 전하실 수 있습니다!" },
+    { type: "danbi", text: "오늘, 당신의 마음을 단비로 전하세요!" },
   ];
 
   const animations = useRef(

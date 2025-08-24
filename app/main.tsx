@@ -84,7 +84,6 @@ export default function ListeningMission() {
   const currentQuestion = QUESTIONS[currentIndex].replace(/\{giver\}/g, giver || "OOO");
 
 
-
   /** 서버 전송 */
   async function postText(lst: string[]) {
     const payload = {
@@ -92,8 +91,8 @@ export default function ListeningMission() {
       flowerTo: lst[1] || "",
       history: lst[2] || "",
 
-      relation: "",
-      anniversary: "생일",
+      relation: "참가자와 심사위원 관계",
+      anniversary: "프로젝트 발표",
       anvDate: "2025-08-20",
     };
 

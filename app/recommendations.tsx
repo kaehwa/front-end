@@ -101,16 +101,21 @@ export default function Recommendations() {
   useEffect(() => {
     (async () => {
       try {
-        // const res = await fetch(`${BACKEND_URL}/api/reco-meta`);
-        // const remote = await res.json() as Partial<typeof meta>;
-        const remote: Partial<typeof meta> = {}; // 데모
-        setMeta((prev) => ({
-          giver: prev.giver || remote.giver || "보내는 분",
-          receiver: prev.receiver || remote.receiver || "받는 분",
-          occasion: prev.occasion || remote.occasion || "특별한 날",
-        }));
-      } catch {
-        // ignore
+        const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/from-to`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const remote: Partial<typeof meta> = await res.json();
+
+        console.log("remote fetched:", remote);
+
+        setMeta({
+          giver: remote.flowerFrom ?? meta.giver,
+          receiver: remote.flowerTo ?? meta.receiver,
+          occasion: remote.occasion ?? meta.occasion,
+        });
+        console.log(`meta.giver => ${meta.giver}`)
+      } catch (err) {
+        console.error("fetch meta failed:", err);
       }
     })();
   }, []);
@@ -120,8 +125,11 @@ export default function Recommendations() {
     setLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/bouquet-similar`);
+      if (res.status == 200){
+        console.log(`success from ${BACKEND_URL}/flowers/${orderID}/bouquet-similar`)
+      }
       const raw: BackendReco[] = await res.json();
-      console.log(`${BACKEND_URL}/flowers/${ID}/bouquet-similar`)
+      console.log(`${BACKEND_URL}/flowers/${orderID}/bouquet-similar`)
       console.log("raw")
       console.log(raw)
       const resData: Bouquet[] = raw.map((r: BackendReco) => ({
@@ -158,11 +166,12 @@ export default function Recommendations() {
   }, [fetchRecommendations]);
 
   // 카드 탭 → 결제(toss)로 이동
-  const onPressCard = (item: Bouquet) => {
+  async function onPressCard (item: Bouquet)  {
     //const orderId = `order_${Date.now()}_${item.id}`;
     const amount = item.price ?? 0;
     const orderName = item.title;
 
+    
     // 이미지 URL(로컬이면 resolveAssetSource로 변환)
     const imgUri = item.imageBase64
       ? LOCAL_BOUQUETS.r1
@@ -172,19 +181,28 @@ export default function Recommendations() {
       try {
         console.log(`Fetch To ${BACKEND_URL}/flowers/${orderID}/bouquet-selection`)
         console.log(`item.id => ${item.id}`)
+
         const payload = {
           selectedBouquetId: item.id,
         };
-        const response = fetch(`${BACKEND_URL}/flowers/${orderID}/bouquet-selection`, 
+        const response = await fetch(`${BACKEND_URL}/flowers/${orderID}/bouquet-selection`, 
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const data = response.json();
-        console.log("POST 성공:", data);
+        const res = await response;
+        console.log(res)
+
+        if (res.status == 201) {
+          const data = res.json();
+          console.log("POST 성공:", data);
+          return data;
+        } else {
+          console.log(" 데이터 응답 본문 없음");
+          
+}
         //console.log("ID:", data.id);
-        return data;
       } catch (e) {
         console.log("POST 실패:");
         console.log(e);

@@ -296,7 +296,7 @@ export default function CardScreen() {
       console.log("raw.bouquetVideoUrl")
       console.log(raw.bouquetVideoUrl)
       console.log("voiceletterBase64")
-      console.log(raw.voiceletterBase64[5])
+      // console.log(raw.voiceletterBase64[5])
       setGifUrl(raw.bouquetVideoUrl)
 
       // base64 → 파일 저장 (있을 때만)

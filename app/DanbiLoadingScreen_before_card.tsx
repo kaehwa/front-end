@@ -125,20 +125,43 @@ export default function DanbiLoadingScreen({
       }
     };
 
-    const loop = async () => {
-      while (active && !isReady) {
-        const ok = await checkUrlReachable(`${TARGET_URL}${orderID}`, 2500);
-        if (!active) break;
-        if (ok) {
-
-          router.push({ pathname: "/card", params: { orderID: orderID ?? "" } });
-          setIsReady(true);
-
-          break;
-        }
-        await new Promise(r => setTimeout(r, 1000));
+    const checkReady = async (url: string) => {
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        return data.ready === true;
+      } catch {
+        return false;
       }
     };
+
+
+  const loop = async () => {
+    while (active && !isReady) {
+      const ok = await checkUrlReachable(`${TARGET_URL}${orderID}`, 2500);
+      console.log(`const ok => ${ok}`)
+      if (!active) break;
+
+      // 진행률이 충분히 찼는지 확인 (예: 95% 이상)
+      if (ok && progress >= 0.95) {
+        console.log(`ok && progress => ${progress}`)
+        setIsReady(true);
+
+        // 애니메이션 끝나고 100% 채우기
+        setProgress(1);
+
+        // 약간의 딜레이 후 이동 (0.3~0.5초 정도)
+        setTimeout(() => {
+          router.push({ pathname: "/card", params: { orderID: orderID ?? "" } });
+        }, 400);
+
+        break;
+      }
+
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  };
+
 
     loop();
     return () => { active = false; };

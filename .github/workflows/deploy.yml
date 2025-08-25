@@ -10,42 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 레포지토리 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Node.js 세팅
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 22
 
-      # 3. 의존성 설치
       - name: Install dependencies
         run: npm install --force
 
-      # 4. Expo Web 빌드
       - name: Build Expo Web
         run: npx expo export --platform web
 
-      # 5. 빌드 결과 확인
       - name: Verify build output
         run: ls -la dist
 
-      # 6. Azure VM으로 배포
       - name: Deploy to Azure VM
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           source: |
             dist/**
+            assets/**
+            favicon.ico
+            *.html
           target: "/var/www/expogo"
           strip_components: 0
           overwrite: true
 
-      # 7. Nginx 리로드
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -53,4 +49,6 @@ jobs:
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
+            # 권한 문제가 있을 경우 미리 변경
+            # sudo chown -R ${{ secrets.AZURE_USER }} /var/www/expogo
             sudo systemctl reload nginx

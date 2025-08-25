@@ -11,27 +11,30 @@ jobs:
 
     defaults:
       run:
-        working-directory: gaehwa-web
+        working-directory: front-end/gaehwa-web  # Expo 프로젝트 경로
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Setup Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 22
+          node-version: 18
 
       - name: Install dependencies
         run: npm install --force
 
+      - name: Install Expo CLI
+        run: npm install -g expo@53.0.20
+
       - name: Export Expo Web
-        run: npx expo export --platform web
+        run: expo export --platform web
 
-      - name: Verify build output
-        run: ls -la web-build
+      - name: Verify web build output
+        run: ls -la web-build  # expo export 기본 출력 디렉토리
 
-      - name: Deploy to Azure VM
+      - name: Deploy to Azure VM via SCP
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.AZURE_HOST }}
@@ -40,6 +43,8 @@ jobs:
           source: |
             web-build/
             public/
+            package.json
+            package-lock.json
           target: "/var/www/expogo"
           strip_components: 0
           overwrite: true

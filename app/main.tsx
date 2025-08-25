@@ -20,12 +20,14 @@ export default function ListeningMission() {
   const QUESTIONS = [
     "꽃으로 마음을 담아 전한다면,\n꽃을 건네실 분은 누구일까요?",
     "{giver} 님은 어느 분께 꽃을 전하고 싶으신가요?",
+    "두 분은 어떤 관계이신가요?",
     "전하고싶은 소중한 순간, 하나 떠올려 주실 수 있을까요?\n더 따뜻한 카드를 만들어 드릴게요.",
   ];
 
   const PLACEHOLDERS = [
     "예) 아내, 딸, 나",
     "예) 할머니, 친구, 어머니",
+    "예) 예) 부부",
     "예) 우리는 30년을 같이 살았고, 고맙다는 마음을 전해요",
   ];
 
@@ -89,9 +91,10 @@ export default function ListeningMission() {
     const payload = {
       flowerFrom: lst[0] || "",
       flowerTo: lst[1] || "",
-      history: lst[2] || "",
+      relation: lst[2] || "",
+      history: lst[3] || "",
 
-      relation: "참가자와 심사위원 관계",
+      //relation: "참가자와 심사위원 관계",
       anniversary: "프로젝트 발표",
       anvDate: "2025-08-20",
     };

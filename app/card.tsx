@@ -751,7 +751,7 @@ export default function CardScreen() {
               id: String(stableId),
               to: nameForCaption,
               title: "꽃카드가 도착했어요!",
-              text: "선아님이 보낸 꽃카드가 도착했어요! 확인해보시겠어요?",
+              text: "확인해보시겠어요?",
               url: inviteUrl,
               image: imageUrl,
             },

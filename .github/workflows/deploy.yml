@@ -14,7 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Node.js 설치
+      # 2. Node.js 설정
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -31,12 +31,14 @@ jobs:
       # 5. 빌드 결과 확인
       - name: Verify build output
         run: |
-          pwd
-          ls -la
-          ls -la dist
-          ls -la assets
+          echo "dist 폴더 내용:"
+          ls -la ./dist
+          echo "assets 폴더 내용:"
+          ls -la ./assets
+          echo "루트 html 파일:"
+          ls -la ./*.html
 
-      # 6. Azure VM에 배포
+      # 6. Azure VM 배포
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@master
         with:
@@ -52,7 +54,7 @@ jobs:
           strip_components: 0
           overwrite: true
 
-      # 7. nginx 재시작
+      # 7. nginx 리로드
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7
         with:

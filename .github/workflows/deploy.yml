@@ -21,40 +21,28 @@ jobs:
       - name: Install dependencies
         run: npm install --force
 
-      - name: Install Expo CLI locally
-        run: npm install expo@latest --save-dev
-
       - name: Build Expo Web
         run: npx expo export --platform web
 
       - name: Verify build output
-        run: |
-          if [ -d dist ]; then
-            echo "dist exists"
-            ls -la dist
-          else
-            echo "dist folder does not exist. Exiting."
-            exit 1
-          fi
+        run: ls -la _expo/static
 
       - name: Deploy to Azure VM
-        if: success()  # 이전 단계 실패 시 스킵
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
           source: |
-            dist/**
+            _expo/static/**
             assets/**
-            favicon.ico
             *.html
+            favicon.ico
           target: "/var/www/expogo"
           strip_components: 0
           overwrite: true
 
       - name: Reload nginx
-        if: success()
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.AZURE_HOST }}

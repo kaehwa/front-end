@@ -11,29 +11,36 @@ jobs:
 
     defaults:
       run:
-        working-directory: gaehwa-web
+        working-directory: front-end/gaehwa-web  # 실제 Expo 프로젝트 경로
 
     steps:
+      # 1️⃣ 레포 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2️⃣ Node.js 설치 (호환 안정성을 위해 v20 사용)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 22
+          node-version: 20
 
-      - name: Install global Expo CLI
-        run: npm install -g expo-cli@53.0.20
-
+      # 3️⃣ 의존성 설치
       - name: Install dependencies
         run: npm install --force
 
+      # 4️⃣ Expo CLI 설치 (최신 안정 버전)
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      # 5️⃣ Expo 웹 빌드
       - name: Build Expo Web
         run: npx expo export --platform web
 
+      # 6️⃣ 빌드 결과 확인
       - name: Verify build output
-        run: ls -la web-build/
+        run: ls -la web-build/   # expo export 기본 출력 폴더
 
+      # 7️⃣ Azure VM에 업로드
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -43,17 +50,15 @@ jobs:
           source: |
             web-build/
             public/
-            package.json
-            package-lock.json
           target: "/var/www/expogo"
           strip_components: 0
           overwrite: true
 
+      # 8️⃣ nginx 재시작
       - name: Reload nginx
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          script: |
-            sudo systemctl reload nginx
+          script: sudo systemctl reload nginx

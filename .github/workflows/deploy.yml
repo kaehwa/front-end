@@ -1,4 +1,4 @@
-name: Deploy Web to Azure VM
+name: Deploy Expo Web to Azure VM
 
 on:
   push:
@@ -25,29 +25,30 @@ jobs:
       - name: Install dependencies
         run: npm install --force
 
-      - name: Build Next.js
-        run: npm run build -- --no-lint
+      - name: Export Expo Web
+        run: npx expo export --platform web
 
       - name: Verify build output
-        run: ls -la .next
+        run: ls -la web-build
 
-      - name: Save SSH key
-        run: |
-          echo "${{ secrets.AZURE_SSH_KEY }}" > ./azure_key
-          chmod 600 ./azure_key
-
-      - name: Deploy to Azure VM via SCP
-        run: |
-          echo "Deploying to Azure VM..."
-          scp -i ./azure_key -r \
-            .next/* \
-            public/* \
-            package.json \
-            package-lock.json \
-            next.config.js \
-            ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }}:/var/www/expogo
+      - name: Deploy to Azure VM
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          source: |
+            web-build/
+            public/
+          target: "/var/www/expogo"
+          strip_components: 0
+          overwrite: true
 
       - name: Reload nginx
-        run: |
-          ssh -i ./azure_key ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_HOST }} \
-          "sudo systemctl reload nginx"
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            sudo systemctl reload nginx

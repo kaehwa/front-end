@@ -847,7 +847,7 @@ const snapBanner = useCallback(
         }
         accessibilityLabel="다음"
       >
-        <Text style={styles.nextBtnText}>다음</Text>
+        <Text style={styles.nextBtnText}>공유하기</Text>
       </Pressable>
 
       {/* 카드(축 고정) — 스와이프 핸들러만 부착 */}

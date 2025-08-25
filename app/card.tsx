@@ -82,26 +82,6 @@ function buildSynopsis(src: string, target = 160) {
   return { title, body };
 }
 
-// 영화 소개처럼 일부만 노출하는 시놉시스 만들기
-function buildSynopsis(src: string, target = 160) {
-  const txt = (src || "").replace(/\s+/g, " ").trim();
-  if (!txt) return { title: "", body: "" };
-
-  // 첫 문장을 제목 후보로
-  const firstSentence = (txt.split(/[.!?]\s|[。？！]\s?/)[0] || txt).trim();
-  const title = firstSentence.length > 18 ? firstSentence.slice(0, 16) + "…" : firstSentence;
-
-  // 본문 시놉시스: 문장 경계 유지하며 target 길이까지
-  let body = "";
-  for (const seg of txt.split(/(?<=[.!?。？！])\s+/)) {
-    const next = (body ? body + " " : "") + seg.trim();
-    if (next.length <= target) body = next;
-    else break;
-  }
-  if (!body) body = txt.slice(0, target) + "…";
-  return { title, body };
-}
-
 const BACKEND_URL = "http://4.240.103.29:8080";
 
 export default function CardScreen() {

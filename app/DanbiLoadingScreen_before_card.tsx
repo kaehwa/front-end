@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, Image, Animated, Easing, Dimensions,
+  View, Text, StyleSheet, Image, Animated, Easing, Dimensions, 
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {router , useLocalSearchParams } from "expo-router";
 
 const { width } = Dimensions.get("window");
 const BRAND_BG = "#FFF2CC";
@@ -10,7 +11,8 @@ const BRAND_ACCENT = "#FB7431";
 const BRAND_MUTE = "#7A958E";
 
 // ✅ 실제 준비 상태를 확인할 대상 URL (필요 시 변경)
-const TARGET_URL = "http://localhost:8081/card?orderID=25";
+const TARGET_URL = "http://localhost:8081/card?orderID=";
+const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
 
 // 로컬 GIF (경로는 프로젝트 구조에 맞게 조정)
 const DANBI_GIF = require("../assets/mascot/danbi_loading.gif");
@@ -28,6 +30,7 @@ export default function DanbiLoadingScreen({
   // ──────────────────────────────────────────────
   const bob = useRef(new Animated.Value(0)).current;
   const tilt = useRef(new Animated.Value(0)).current;
+  const { orderID } = useLocalSearchParams<{ orderID: string }>();
   useEffect(() => {
     const bobAnim = Animated.loop(
       Animated.sequence([
@@ -124,10 +127,13 @@ export default function DanbiLoadingScreen({
 
     const loop = async () => {
       while (active && !isReady) {
-        const ok = await checkUrlReachable(TARGET_URL, 2500);
+        const ok = await checkUrlReachable(`${TARGET_URL}${orderID}`, 2500);
         if (!active) break;
         if (ok) {
+
+          router.push({ pathname: "/card", params: { orderID: orderID ?? "" } });
           setIsReady(true);
+
           break;
         }
         await new Promise(r => setTimeout(r, 1000));

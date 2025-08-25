@@ -17,7 +17,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
-const BACKEND_URL = "/api"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
 const MAX_LEN = 1000; // 글자 제한 (원하면 조정)
 
 type LetterResponse = {
@@ -69,7 +69,7 @@ export default function LetterPage() {
     setLoadingSlow(false);
     try {
       // 실제 API 예시:
-      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/message`);
+      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/medialetter`);
       const raw = await res.json();
       
       var letter = raw.recommendMessage

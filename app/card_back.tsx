@@ -96,8 +96,6 @@ export default function CardScreen() {
   const inviteUrl = `${BASE_URL}/invite/${stableId}`;
   const imageUrl = `${BASE_URL}/og/${stableId}`;
 
-  const [gifUrl, setGifUrl] = useState<string | null>(null);
-
   const insets = useSafeAreaInsets();
 
   const pageBg = useMemo(
@@ -127,7 +125,6 @@ export default function CardScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
   const [mediaDurationMs, setMediaDurationMs] = useState<number>(0);
-  const [adBase64, setAdBase64] = useState<string>();
 
   // 오디오 핸들
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -229,11 +226,8 @@ export default function CardScreen() {
     setLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter`);
-      console.log(`${BACKEND_URL}/flowers/${cardId}/medialetter`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = await res.json();
-      console.log("raw")
-      console.log(raw)
 
       // 문장 줄바꿈 포맷
       function insertLineBreaksWithDot(str: string, size: number = 25) {
@@ -254,13 +248,6 @@ export default function CardScreen() {
       // base64/URL 정리 (선언을 먼저)
       let videoUri: string | null = raw.videoletterUrl ?? raw.videoUrl ?? raw.bouquetVideoUrl ?? null;
       let audioUri: string | null = raw.voiceletterUrl ?? raw.audioUrl ?? raw.voiceUrl ?? null;
-      setAdBase64(raw.voiceletterBase64)
-      
-      console.log("raw.bouquetVideoUrl")
-      console.log(raw.bouquetVideoUrl)
-      console.log("voiceletterBase64")
-      // console.log(raw.voiceletterBase64)
-      setGifUrl(raw.bouquetVideoUrl)
 
       // base64 → 파일 저장 (있을 때만)
       try {
@@ -269,9 +256,9 @@ export default function CardScreen() {
         const writeB64 = async (b64: string, filename: string) => {
           const path = dir + filename;
           await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
-          return path; 
+          return path; // file://...
         };
-        
+
         const base64Video = raw.videoletterBase64 || raw.videoBase64 || raw.bouquetVideoBase64;
         if (base64Video && typeof base64Video === "string") {
           videoUri = await writeB64(base64Video, `video_${String(cardId)}.mp4`);
@@ -279,7 +266,6 @@ export default function CardScreen() {
 
         const base64Audio = raw.voiceletterBase64 || raw.audioBase64 || raw.voiceBase64;
         if (base64Audio && typeof base64Audio === "string") {
-          console.log("voiceletterBase64")
           audioUri = await writeB64(base64Audio, `audio_${String(cardId)}.m4a`);
         }
       } catch (e) {
@@ -295,14 +281,12 @@ export default function CardScreen() {
         const signedRes = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter?signed=true`);
         if (signedRes.ok) {
           const signedJson = await signedRes.json();
-          console.log("signedJson")
-          console.log(signedJson)
           const signedVideo = signedJson.videoUrl ?? signedJson.videoletterUrl ?? null;
           const signedAudio = signedJson.audioUrl ?? signedJson.voiceletterUrl ?? null;
-          console.log("signedAudio");
-          console.log(signedAudio);
+          console.log("signedRes")
+          console.log(signedRes)
           if (signedVideo) videoUri = signedVideo;
-          if (signedAudio) { audioUri = signedAudio;}
+          if (signedAudio) audioUri = signedAudio;
         }
       } catch (e) {
         console.log("signed fetch failed", e);
@@ -391,27 +375,21 @@ export default function CardScreen() {
 
   // 오디오 로딩
   useEffect(() => {
-    console.log("adBase64")
-    // console.log(adBase64)
-    let audioUrl = adBase64
-    // console.log(audioUrl)
     let mounted = true;
     const loadAudio = async () => {
       if (!data?.audioUrl) return;
       try {
         if (soundRef.current) {
-          console.log(soundRef.current)
           await soundRef.current.unloadAsync().catch(() => {});
           soundRef.current = null;
         }
         const { sound, status } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
+          { uri: data.audioUrl },
           { shouldPlay: false },
           (st) => {
             if (!st || !("isLoaded" in st) || !st.isLoaded) return;
             setIsPlaying(st.isPlaying ?? false);
             setIsEnded((st as any).didJustFinish ?? false);
-            console.log("audio func")
             if (typeof st.durationMillis === "number") setMediaDurationMs(st.durationMillis);
             if ((st as any).didJustFinish) showSwipeCueBriefly();
           }
@@ -796,9 +774,7 @@ export default function CardScreen() {
 
           {/* 중앙 비주얼 */}
           <View style={styles.frontVisual}>
-            {/* source={{ uri: card.videoUrl! }} */}
-            <Image source={{uri: gifUrl}} style={styles.frontVisualImage} resizeMode="cover" />
-            {/* <Image source={BOUQUET_GIF} style={styles.frontVisualImage} resizeMode="cover" /> */}
+            <Image source={BOUQUET_GIF} style={styles.frontVisualImage} resizeMode="cover" />
 
             {(synTitle || synBody) && (
               <Animated.View
@@ -920,7 +896,7 @@ export default function CardScreen() {
               {/* 캡션(날짜/수신인) */}
               <View style={styles.bottomCaption}>
                 <Text style={styles.bottomCaptionText}>
-                  추억을 재생 해보세요!
+                  {formatKoDate()} 사랑하는 000 {nameForCaption}에게
                 </Text>
               </View>
 

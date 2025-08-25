@@ -397,21 +397,20 @@ export default function CardScreen() {
     // console.log(audioUrl)
     let mounted = true;
     const loadAudio = async () => {
-      if (!data?.audioUrl) return;
+      if (!adBase64) return;
       try {
         if (soundRef.current) {
-          console.log(soundRef.current)
+          console.log("soundRef.current")
           await soundRef.current.unloadAsync().catch(() => {});
           soundRef.current = null;
         }
         const { sound, status } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
+          { uri: adBase64 },
           { shouldPlay: false },
           (st) => {
             if (!st || !("isLoaded" in st) || !st.isLoaded) return;
             setIsPlaying(st.isPlaying ?? false);
             setIsEnded((st as any).didJustFinish ?? false);
-            console.log("audio func")
             if (typeof st.durationMillis === "number") setMediaDurationMs(st.durationMillis);
             if ((st as any).didJustFinish) showSwipeCueBriefly();
           }

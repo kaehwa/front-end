@@ -23,7 +23,7 @@ const CARD_W = Math.floor((width - H_PADDING * 2 - GAP) / 2);
 const CARD_H = Math.floor(CARD_W * 1.35);
 
 // ── Config ────────────────────────────────────────────────────────
-const BACKEND_URL = "/api"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "http://4.240.103.29:8080" // TODO: 실제 주소로 교체
 const ID = 22
 
 const BG = "#FFF4DA";
@@ -195,9 +195,9 @@ export default function Recommendations() {
         console.log(res)
 
         if (res.status == 201) {
-          const data = res.json();
-          console.log("POST 성공:", data);
-          return data;
+          // const data = res.json();
+          console.log("POST 성공:");
+          
         } else {
           console.log(" 데이터 응답 본문 없음");
           

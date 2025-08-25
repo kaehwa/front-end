@@ -256,7 +256,7 @@ export default function CardScreen() {
     const path = String(u).replace(/^\//, "");
     console.log("!!!!path")
     console.log(path)
-    return `${prefix}/${path}`;
+    return `${path}`;
   };
 
 

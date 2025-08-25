@@ -170,17 +170,20 @@ export default function Recommendations() {
     //const orderId = `order_${Date.now()}_${item.id}`;
     const amount = item.price ?? 0;
     const orderName = item.title;
-
+    const imageBase64 = item.imageBase64
+    console.log("imageBase64")
+    console.log(imageBase64)
     
     // 이미지 URL(로컬이면 resolveAssetSource로 변환)
     const imgUri = item.imageBase64
       ? LOCAL_BOUQUETS.r1
       : item.imageUrl || "";
-
+      
       ////////////////////////부켓 선택시 해당 id로 가도록 POST/////////////////////////
       try {
         console.log(`Fetch To ${BACKEND_URL}/flowers/${orderID}/bouquet-selection`)
         console.log(`item.id => ${item.id}`)
+        console.log(`imgUri => ${imgUri}`)
 
         const payload = {
           selectedBouquetId: item.id,
@@ -217,6 +220,7 @@ export default function Recommendations() {
         orderID : orderID,
         title: item.title ?? "",
         localKey: item.imageLocal ?? "",
+        imgUri : imageBase64,
         imageUrl: item.imageUrl ? encodeURIComponent(item.imageUrl) : "",
         palette: JSON.stringify(item.palette ?? []),bg,
       },

@@ -17,7 +17,7 @@ const TEXT = "#1F2937";
 const SUB = "#6b7280";
 const ACCENT = "#FB7431";
 
-const BACKEND_URL = "/api"; // 준비되면 교체
+const BACKEND_URL = "http://4.240.103.29:8080"; // 준비되면 교체
 
 /** ===== 로컬 더미 에셋 맵 =====
  *  프로젝트 경로에 맞게 이미지 파일만 넣어주면 바로 작동합니다.
@@ -31,10 +31,8 @@ const LOCAL_BOUQUETS = {
 
 type LocalKey = keyof typeof LOCAL_BOUQUETS;
 
-/** 원격/로컬 공용 데이터 타입 (imageUrl 제거) */
 type Data = {
-  uri?: string;           // 원격일 때
-  //localKey?: LocalKey;    // 로컬일 때
+  uri?: string;           // 원격 이미지 URL
   title?: string;
   palette?: string[];
   floristName?: string;
@@ -49,11 +47,17 @@ type LocalMeta = {
 export default function ConfirmSelectedBouquet() {
   
   const params = useLocalSearchParams<{ id?: string }>();
+  const { imgUri } = useLocalSearchParams<{ imgUri: string }>();
+  
   const { orderID } = useLocalSearchParams<{ orderID: string }>();
   const stableId = useMemo(
     () => (typeof params.id === "string" ? params.id : params.id ? String(params.id) : ""),
     [params.id]
   );
+
+  console.log("params")
+  console.log(params)
+  
   const insets = useSafeAreaInsets();
 
   const [data, setData] = useState<Data | null>(null);
@@ -191,13 +195,18 @@ export default function ConfirmSelectedBouquet() {
   }
 
   if (!data) return null;
+  
+  
+  const source = imgUri
+    // ? data.localKey
+    //   ? LOCAL_BOUQUETS[data.localKey]
+    //   : data.uri
+    //     ? { uri: data.uri }
+    //     : LOCAL_BOUQUETS.r1
+    // : LOCAL_BOUQUETS.r1;
 
-  const source =
-    data.localKey
-      ? LOCAL_BOUQUETS[data.localKey]
-      : data.uri
-        ? { uri: data.uri }
-        : LOCAL_BOUQUETS.r1; // 최후 폴백
+  console.log("source")
+  console.log(source)
 
   return (
     <View style={styles.container}>
@@ -216,7 +225,7 @@ export default function ConfirmSelectedBouquet() {
         </View>
 
         <Animated.View style={[styles.mediaWrap, { opacity: imgOpacity, transform: [{ translateY: imgY }] }]}>
-          <Image source={source} style={styles.media} resizeMode="cover" />
+          <Image source={{uri: `data:image/png;base64,${imgUri}`}} style={styles.media} resizeMode="cover" />
         </Animated.View>
 
         <View style={styles.metaArea}>
@@ -251,7 +260,14 @@ export default function ConfirmSelectedBouquet() {
           <Text style={styles.ctaPrimaryText}>선택 완료</Text>
         </Pressable>
 
-        <Pressable style={[styles.cta, styles.ctaGhost]} onPress={() => router.replace("/recommendations")}>
+          <Pressable
+            style={[styles.cta, styles.ctaGhost]}
+            onPress={() =>
+              router.replace({
+                pathname: "/recommendations",
+                params: { id: stableId, orderID: orderID } // 기존 param 그대로 전달
+              })
+            }>
           <Ionicons name="albums-outline" size={18} color={ACCENT} />
           <Text style={[styles.ctaGhostText, { color: ACCENT }]}>다른 추천 보기</Text>
         </Pressable>

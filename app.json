@@ -18,10 +18,10 @@
       "bundleIdentifier": "com.gaehwa.app"
     },
     "android": {
+      "package": "com.gaehwa.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff",
-        "package": "com.gaehwa.app"
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true
     },
@@ -32,8 +32,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-asset",
-      "expo-web-browser"
+      [
+        "@react-native-kakao/core",
+        {
+          "nativeAppKey": "<카카오 네이티브 앱 키>",
+          "android": { "forwardKakaoLinkIntentFilterToMainActivity": true }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -11,6 +11,8 @@ import {
 } from "react-native";
 
 const { width: W0 } = Dimensions.get("window");
+// ── 왁스 씰 리소스 ──────────────────────────────────────────────────────────
+ 
 
 type Palette = {
   shell: string;
@@ -127,6 +129,7 @@ export default function EnvelopeOverlay({
       }),
     ]);
 
+    
     /** ✅ openDuration이 끝나자마자 카드가 즉시 보이게 */
     const showCardQuick = Animated.timing(cardOpacity, {
       toValue: 1,

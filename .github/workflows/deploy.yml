@@ -6,8 +6,12 @@ on:
       - master
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./front-end  # 실제 존재하는 Expo 프로젝트 루트
 
     steps:
       - name: Checkout repository
@@ -20,14 +24,12 @@ jobs:
 
       - name: Install dependencies
         run: npm install --force
-        working-directory: ./front-end
 
       - name: Build Expo Web
         run: npx expo export --platform web
-        working-directory: ./front-end
 
-      - name: Verify dist
-        run: ls -la ./front-end/dist
+      - name: Verify build output
+        run: ls -la dist
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
@@ -35,8 +37,12 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          source: ./front-end/dist/
-          target: /var/www/expogo
+          source: |
+            dist/**
+            assets/**
+            favicon.ico
+            *.html
+          target: "/var/www/expogo"
           strip_components: 0
           overwrite: true
 

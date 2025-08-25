@@ -17,7 +17,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
-const BACKEND_URL = "http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "/api"//"http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
 const MAX_LEN = 1000; // 글자 제한 (원하면 조정)
 
 type LetterResponse = {
@@ -139,6 +139,8 @@ export default function LetterPage() {
   };
 
   const handlePress = async () => {
+    console.log("serverLetter")
+    console.log(serverLetter)
     try {
       // 1️⃣ POST 요청
       const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/message`, {
@@ -148,7 +150,7 @@ export default function LetterPage() {
       });
 
       const data = await res.json();
-      console.log("POST 결과:", data);
+      console.log("PATCH 결과:", data);
 
       // 2️⃣ POST 완료 후 페이지 이동 --> 완료 페이지로 로딩
       router.push({ pathname: "/DanbiLoadingScreen_before_card", params: { orderID: orderID ?? "" } });

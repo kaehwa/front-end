@@ -12,7 +12,7 @@ const BRAND_MUTE = "#7A958E";
 
 // ✅ 실제 준비 상태를 확인할 대상 URL (필요 시 변경)
 const TARGET_URL = "http://localhost:8081/card?orderID=";
-const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
+const BACK_SWAGGER_URL = "api";
 
 // 로컬 GIF (경로는 프로젝트 구조에 맞게 조정)
 const DANBI_GIF = require("../assets/mascot/danbi_loading.gif");

@@ -83,7 +83,7 @@ function buildSynopsis(src: string, target = 160) {
   return { title, body };
 }
 
-const BACKEND_URL = "http://4.240.103.29:8080";
+const BACKEND_URL = "/api"//"http://4.240.103.29:8080";
 
 export default function CardScreen() {
   const { id, orderID, to, bg } = useLocalSearchParams<{

@@ -541,7 +541,7 @@ export default function CardScreen() {
 
     const hasVideo = !!(data?.videoLocal || data?.videoUrl);
     const hasAudio = !!data?.audioUrl;
-    
+
     if (hasVideo) {
       await stopAudioIfPlaying(); // 동시재생 방지
       setOverlayVisible(true);
@@ -692,7 +692,7 @@ export default function CardScreen() {
     });
   };
 
-const snapBanner = useCallback(
+  const snapBanner = useCallback(
     (open: boolean, startWhenOpen = true) => {
       setBannerOpen(open);
       Animated.timing(bannerTY, {
@@ -701,31 +701,17 @@ const snapBanner = useCallback(
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start(() => {
-        if (open && startWhenOpen && lines.length > 0) startReveal();
+        if (open && startWhenOpen && lines.length > 0) {
+          startReveal();
+        }
         if (!open) {
           stopRevealTimers();
           setVisibleLineCount(0);
         }
-        if (open && data?.audioUrl) {
-          
-          (async () => {
-            try {
-
-              const snd = soundRef.current;
-              if (!snd) return;
-              const st = await snd.getStatusAsync();
-              
-              if (st && "isLoaded" in st && st.isLoaded && !st.isPlaying) {
-                await snd.playAsync();
-              }
-            } catch {}
-          })();
-        }
       });
     },
-    [bannerTY, lines.length, data?.audioUrl]
+    [bannerTY, lines.length]
   );
-  
 
   // ✅ 배너 드래그 제스처
   const bannerPanResponder = useMemo(
@@ -879,7 +865,7 @@ const snapBanner = useCallback(
                 />
                 <Pressable
                   style={styles.synopsisInner}
-                  onPress={() => {snapBanner(true);}}
+                  onPress={() => snapBanner(true)}
                   accessibilityLabel="편지 자세히 보기"
                 >
                   {synTitle ? <Text style={styles.synopsisTitle}>{synTitle}</Text> : null}

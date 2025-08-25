@@ -34,7 +34,7 @@ type LocalKey = keyof typeof LOCAL_BOUQUETS;
 /** 원격/로컬 공용 데이터 타입 (imageUrl 제거) */
 type Data = {
   uri?: string;           // 원격일 때
-  localKey?: LocalKey;    // 로컬일 때
+  //localKey?: LocalKey;    // 로컬일 때
   title?: string;
   palette?: string[];
   floristName?: string;

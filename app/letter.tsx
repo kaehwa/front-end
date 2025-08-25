@@ -17,7 +17,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
-const BACKEND_URL = "/api"//"http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
+const BACKEND_URL = "http://4.240.103.29:8080"//"http://4.240.103.29:8080"; // TODO: 실제 주소로 교체
 const MAX_LEN = 1000; // 글자 제한 (원하면 조정)
 
 type LetterResponse = {
@@ -69,10 +69,15 @@ export default function LetterPage() {
     setLoadingSlow(false);
     try {
       // 실제 API 예시:
-      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/medialetter`);
+      const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/message`);
+      console.log(`fatch ${BACKEND_URL}/flowers/${orderID}/message`)
       const raw = await res.json();
-      
+      console.log(raw)
       var letter = raw.recommendMessage
+
+      console.log("letter")
+      
+      console.log(raw.recommendMessage)
 
       setServerLetter(letter);
       setDraft(letter);
@@ -142,7 +147,7 @@ export default function LetterPage() {
     console.log("serverLetter")
     console.log(serverLetter)
     try {
-      // 1️⃣ POST 요청
+      // 1️⃣ PATCH 요청
       const res = await fetch(`${BACKEND_URL}/flowers/${orderID}/message`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -152,10 +157,10 @@ export default function LetterPage() {
       const data = await res.json();
       console.log("PATCH 결과:", data);
 
-      // 2️⃣ POST 완료 후 페이지 이동 --> 완료 페이지로 로딩
+      // 2️⃣ PATCH 완료 후 페이지 이동 --> 완료 페이지로 로딩
       router.push({ pathname: "/DanbiLoadingScreen_before_card", params: { orderID: orderID ?? "" } });
     } catch (err) {
-      console.error("POST 실패:", err);
+      console.error("PATCH 실패:", err);
     }
   };
 

@@ -95,7 +95,7 @@ export default function ListeningMission() {
       history: lst[3] || "",
 
       //relation: "참가자와 심사위원 관계",
-      anniversary: "프로젝트 발표",
+      anniversary: "",
       anvDate: "2025-08-20",
     };
 

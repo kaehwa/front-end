@@ -16,8 +16,10 @@ import {
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Video, ResizeMode, AVPlaybackStatusSuccess, Audio } from "expo-av";
-import EnvelopeOverlay from "../app/EnvelopeOverlay";
 import * as FileSystem from "expo-file-system";
+import { LinearGradient } from "expo-linear-gradient";
+
+import EnvelopeOverlay from "../app/EnvelopeOverlay";
 
 // ── 화면/카드 치수 ───────────────────────────────────────────────────────────
 const { width, height } = Dimensions.get("window");
@@ -26,16 +28,9 @@ const CARD_H = Math.min(620, Math.round(height * 0.8));
 const PHOTO_H = Math.round(CARD_W * 0.9);
 const PAGE_BG = "#F5EFE3";
 const BANNER_MAX_H = Math.min(Math.round(CARD_H * 0.65), 420);
-const { id } = useLocalSearchParams<{ id?: string }>();
-const stableId = String(id ?? "preview");
 
 // ── 카카오톡 공유 ───────────────────────────────────────────────────────────
-const BASE_URL = __DEV__
-  ? "https://f77e2967d1e4.ngrok-free.app"   // 개발: ngrok
-  : "https://gaehwa.app";                    // 운영: 정식 도메인
-
-const inviteUrl = `${BASE_URL}/invite/${stableId}`;
-const imageUrl  = `${BASE_URL}/og/${stableId}`; // 또는 `${BASE_URL}/static/danbi.png`
+const BASE_URL = __DEV__ ? "https://f77e2967d1e4.ngrok-free.app" : "https://gaehwa.app";
 
 // ── 종이 텍스처 ─────────────────────────────────────────────────────────────
 const PAPER_TEXTURE =
@@ -45,13 +40,14 @@ const PAPER_TEXTURE =
 const LOCAL_VIDEO = require("../assets/videos/file.mp4");
 const CORNER_TAPE = require("../assets/images/tape.png");
 const BOUQUET_GIF = require("../assets/videos/file.gif");
+
 // ── 타입 ────────────────────────────────────────────────────────────────────
 type CardPayload = {
   id: string;
   letter: string;
-  videoUrl?: string | null;     // 절대 URL 또는 file://
-  videoLocal?: number | null;   // require(...) 모듈 아이디
-  audioUrl?: string | null;     // 절대 URL 또는 file://
+  videoUrl?: string | null; // 절대 URL 또는 file://
+  videoLocal?: number | null; // require(...) 모듈 아이디
+  audioUrl?: string | null; // 절대 URL 또는 file://
   coverImageUrl?: string | null;
   backImageUrl?: string | null;
   createdAtIso?: string | null;
@@ -66,16 +62,46 @@ function formatKoDate(d = new Date()) {
   return `${yyyy}.${mm}.${dd}.`;
 }
 
+// 영화 소개처럼 일부만 노출하는 시놉시스 만들기
+function buildSynopsis(src: string, target = 160) {
+  const txt = (src || "").replace(/\s+/g, " ").trim();
+  if (!txt) return { title: "", body: "" };
+
+  // 첫 문장을 제목 후보로
+  const firstSentence = (txt.split(/[.!?]\s|[。？！]\s?/)[0] || txt).trim();
+  const title = firstSentence.length > 18 ? firstSentence.slice(0, 16) + "…" : firstSentence;
+
+  // 본문 시놉시스: 문장 경계 유지하며 target 길이까지
+  let body = "";
+  for (const seg of txt.split(/(?<=[.!?。？！])\s+/)) {
+    const next = (body ? body + " " : "") + seg.trim();
+    if (next.length <= target) body = next;
+    else break;
+  }
+  if (!body) body = txt.slice(0, target) + "…";
+  return { title, body };
+}
+
 const BACKEND_URL = "http://4.240.103.29:8080";
 
 export default function CardScreen() {
-  const { orderID, to,bg } = useLocalSearchParams<{ orderID?: string; to?: string; bg?: string }>();
+  const { id, orderID, to, bg } = useLocalSearchParams<{
+    id?: string;
+    orderID?: string;
+    to?: string;
+    bg?: string;
+  }>();
+
+  const stableId = String(id ?? orderID ?? "preview");
+  const inviteUrl = `${BASE_URL}/invite/${stableId}`;
+  const imageUrl = `${BASE_URL}/og/${stableId}`;
+
   const insets = useSafeAreaInsets();
 
   const pageBg = useMemo(
-  () => (typeof bg === "string" && bg.trim().length > 0 ? bg : PAGE_BG),
-  [bg]
-);
+    () => (typeof bg === "string" && bg.trim().length > 0 ? bg : PAGE_BG),
+    [bg]
+  );
 
   // ── 인트로(봉투) ─────────────────────────────────────────────────────────
   const [showIntro, setShowIntro] = useState(true);
@@ -127,6 +153,13 @@ export default function CardScreen() {
 
   // ── Letter reveal ────────────────────────────────────────────────────────
   const [visibleLineCount, setVisibleLineCount] = useState(0);
+  const teaser = useMemo(() => {
+    const t = (data?.letter ?? "").replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    const first = t.split(/[.!?]\s|\\n/)[0] ?? t;
+    return first.length > 38 ? first.slice(0, 36) + "…" : first;
+  }, [data?.letter]);
+
   const revealTimers = useRef<number[]>([]);
   const lines = useMemo(() => {
     const text = data?.letter ?? "";
@@ -175,7 +208,6 @@ export default function CardScreen() {
     });
   }, [hideSwipeCue, swipeCueOpacity]);
 
-  const stableId = orderID;
   const fetchedRef = useRef(false);
 
   // ── URI 정규화 ────────────────────────────────────────────────────────────
@@ -213,31 +245,11 @@ export default function CardScreen() {
       }
       const formatMessage = insertLineBreaksWithDot(raw.recommendMessage, 28);
 
-  // 백엔드에 서명된 URL을 요청해봅니다(백엔드가 지원하는 경우).
-      try {
-        const signedRes = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter?signed=true`);
-        if (signedRes.ok) {
-          const signedJson = await signedRes.json();
-          // backend may return signed video/audio URLs directly
-          if (signedJson.videoUrl || signedJson.videoletterUrl) {
-            const signedVideo = signedJson.videoUrl ?? signedJson.videoletterUrl;
-            // prefer signed URL from backend
-            videoUri = signedVideo || videoUri;
-          }
-          if (signedJson.audioUrl || signedJson.voiceletterUrl) {
-            const signedAudio = signedJson.audioUrl ?? signedJson.voiceletterUrl;
-            audioUri = signedAudio || audioUri;
-          }
-        }
-      } catch (e) {
-        // ignore — fallback to existing behavior
-        console.log('signed fetch failed', e);
-      }
-
-      // base64 → 파일 저장 (있을 때만)
+      // base64/URL 정리 (선언을 먼저)
       let videoUri: string | null = raw.videoletterUrl ?? raw.videoUrl ?? raw.bouquetVideoUrl ?? null;
       let audioUri: string | null = raw.voiceletterUrl ?? raw.audioUrl ?? raw.voiceUrl ?? null;
 
+      // base64 → 파일 저장 (있을 때만)
       try {
         const dir = `${FileSystem.documentDirectory}media/`;
         await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
@@ -264,7 +276,7 @@ export default function CardScreen() {
       videoUri = normalizeRemote(videoUri);
       audioUri = normalizeRemote(audioUri);
 
-      // 백엔드 요청
+      // 백엔드에서 서명 URL 재요청 (가능하면 오버라이드)
       try {
         const signedRes = await fetch(`${BACKEND_URL}/flowers/${cardId}/medialetter?signed=true`);
         if (signedRes.ok) {
@@ -275,38 +287,32 @@ export default function CardScreen() {
           if (signedAudio) audioUri = signedAudio;
         }
       } catch (e) {
-        console.log('signed fetch failed', e);
+        console.log("signed fetch failed", e);
       }
 
-  // 직접 블롭 접근이 실패(409 PublicAccessNotPermitted)하거나 네트워크/CORS 오류가 발생하면
-  // 로컬 프록시 엔드포인트로 폴백합니다(블롭을 스트리밍).
-    const PROXY_BASE = "http://localhost:3000";
-    const resolveWithProxy = async (u?: string | null): Promise<string | null> => {
+      // 직접 블롭 접근 실패/CORS 시 프록시 폴백
+      const PROXY_BASE = "http://localhost:3000";
+      const resolveWithProxy = async (u?: string | null): Promise<string | null> => {
         if (!u) return null;
         try {
-      // 프록시 폴백 대상은 Azure blob URL만 고려합니다
           if (!/^https?:\/\//i.test(u)) return u;
           const urlObj = new URL(u);
-      if (!urlObj.hostname.endsWith('blob.core.windows.net')) return u;
+          if (!urlObj.hostname.endsWith("blob.core.windows.net")) return u;
 
-          // 접근 가능 여부를 빠르게 확인하기 위해 HEAD 요청을 시도합니다
           try {
-            const head = await fetch(u, { method: 'HEAD' });
-            if (head.ok) return u; // direct access works
-            // 서버가 공개 접근을 명시적으로 차단하면 프록시로 대체합니다
+            const head = await fetch(u, { method: "HEAD" });
+            if (head.ok) return u;
             if (head.status === 409) {
-              const parts = urlObj.pathname.replace(/^\//, '').split('/');
+              const parts = urlObj.pathname.replace(/^\//, "").split("/");
               parts.shift();
-              const blobPath = parts.join('/');
+              const blobPath = parts.join("/");
               return `${PROXY_BASE}/proxy?blob=${encodeURIComponent(blobPath)}`;
             }
-            // 그 외에는 원본 URL을 유지합니다
             return u;
           } catch (e) {
-            // 네트워크 또는 CORS 오류인 경우 프록시로 폴백합니다
-            const parts = urlObj.pathname.replace(/^\//, '').split('/');
+            const parts = urlObj.pathname.replace(/^\//, "").split("/");
             parts.shift();
-            const blobPath = parts.join('/');
+            const blobPath = parts.join("/");
             return `${PROXY_BASE}/proxy?blob=${encodeURIComponent(blobPath)}`;
           }
         } catch (e) {
@@ -621,7 +627,9 @@ export default function CardScreen() {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start(() => {
-        if (open && startWhenOpen && lines.length > 0) startReveal();
+        if (open && startWhenOpen && lines.length > 0) {
+          startReveal();
+        }
         if (!open) {
           stopRevealTimers();
           setVisibleLineCount(0);
@@ -631,21 +639,19 @@ export default function CardScreen() {
     [bannerTY, lines.length]
   );
 
-  // ✅ 배너 드래그 제스처 (정의 누락 보완)
+  // ✅ 배너 드래그 제스처
   const bannerPanResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dy) > Math.abs(g.dx) && Math.abs(g.dy) > 6,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > Math.abs(g.dx) && Math.abs(g.dy) > 6,
         onPanResponderMove: (_, g) => {
           hideSwipeCue();
           const next = Math.min(BANNER_MAX_H, Math.max(0, BANNER_MAX_H + g.dy));
           bannerTY.setValue(next);
         },
         onPanResponderRelease: (_, g) => {
-          const openedEnough =
-            BANNER_MAX_H + g.dy < BANNER_MAX_H * 0.6 || g.vy < -0.8;
+          const openedEnough = BANNER_MAX_H + g.dy < BANNER_MAX_H * 0.6 || g.vy < -0.8;
           snapBanner(openedEnough);
         },
         onPanResponderTerminate: () => {
@@ -655,13 +661,40 @@ export default function CardScreen() {
     [hideSwipeCue, snapBanner]
   );
 
+  // 시놉시스(앞면 좌하단) 계산 & 애니메이션
+  const { title: synTitle, body: synBody } = useMemo(
+    () => buildSynopsis(data?.letter ?? "", 160),
+    [data?.letter]
+  );
+  const teaserInY = useRef(new Animated.Value(18)).current;
+  const teaserInOp = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!showIntro && data) {
+      teaserInY.setValue(18);
+      teaserInOp.setValue(0);
+      Animated.parallel([
+        Animated.timing(teaserInY, {
+          toValue: 0,
+          duration: 380,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(teaserInOp, {
+          toValue: 1,
+          duration: 420,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showIntro, data, teaserInY, teaserInOp]);
+
   // 소스
   const coverUri = data?.coverImageUrl ?? "https://via.placeholder.com/1200x1600.png?text=Poster";
   const nameForCaption = (to && String(to).trim()) || data?.recipientName || "";
 
   const videoSource: any =
-    (data?.videoLocal as number | undefined) ??
-    (data?.videoUrl ? { uri: data.videoUrl } : undefined);
+    (data?.videoLocal as number | undefined) ?? (data?.videoUrl ? { uri: data.videoUrl } : undefined);
 
   const hasVideo = !!videoSource;
   const hasAudioOnly = !hasVideo && !!data?.audioUrl;
@@ -705,20 +738,24 @@ export default function CardScreen() {
     <View style={[styles.page, { paddingTop: Math.max(insets.top, 16), backgroundColor: pageBg }]}>
       {/* 인트로 봉투 */}
       {showIntro && (
-        <EnvelopeOverlay
-          onDone={handleIntroDone}
-          palette={{ shell: "#F2D5C9", liner: "#FFEDE4", bg: "transparent" }}
-        />
+        <EnvelopeOverlay onDone={handleIntroDone} palette={{ shell: "#F2D5C9", liner: "#FFEDE4", bg: "transparent" }} />
       )}
 
       {/* 우상단 '다음' */}
       <Pressable
         style={[styles.nextBtn, { top: 8, right: 12 }]}
         onPress={() =>
-          router.push({ pathname: "/share", params: { id: String(stableId), to: nameForCaption, title: "꽃카드가 도착했어요!",
-    text: "선아님이 보낸 꽃카드가 도착했어요! 확인해보시겠어요?",
-    url: inviteUrl,
-    image: imageUrl, } })
+          router.push({
+            pathname: "/share",
+            params: {
+              id: String(stableId),
+              to: nameForCaption,
+              title: "꽃카드가 도착했어요!",
+              text: "선아님이 보낸 꽃카드가 도착했어요! 확인해보시겠어요?",
+              url: inviteUrl,
+              image: imageUrl,
+            },
+          })
         }
         accessibilityLabel="다음"
       >
@@ -727,59 +764,44 @@ export default function CardScreen() {
 
       {/* 카드(축 고정) — 스와이프 핸들러만 부착 */}
       <Animated.View style={[styles.cardShadowWrap, { opacity: mainOpacity }]} {...swipeResponder.panHandlers}>
-        {/* 앞면 */}
-        <Animated.View
-          style={[styles.cardBase, { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] }]}
-        >
-          {/* 폴라로이드 묶음 */}
-          <View style={styles.polaroidWrap}>
-            <View style={styles.polaroidInner}>
-              <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
+        {/* 앞면: 꽃다발 미리보기 + 좌하단 시놉시스 오버레이 */}
+        <Animated.View style={[styles.cardBase, { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] }]}>
+          {/* 종이 텍스처 */}
+          <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} />
 
-              {/* 사진/영상 영역 */}
-              <View style={styles.photoArea}>
-                {hasVideo ? (
-                  <Video
-                    source={videoSource}
-                    style={styles.video}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay={false}
-                    isMuted
-                    usePoster
-                    posterSource={{ uri: coverUri }}
-                  />
-                ) : (
-                  <Image source={{ uri: coverUri }} style={styles.pastedPhoto} />
-                )}
+          {/* 중앙 비주얼 */}
+          <View style={styles.frontVisual}>
+            <Image source={BOUQUET_GIF} style={styles.frontVisualImage} resizeMode="cover" />
 
-                {hasVideo && <View style={styles.previewBlack} pointerEvents="none" />}
-
-                {/* 중앙 컨트롤: 탭=재생, 롱탭=리셋 */}
+            {(synTitle || synBody) && (
+              <Animated.View
+                style={[
+                  styles.synopsisWrap,
+                  { opacity: teaserInOp, transform: [{ translateY: teaserInY }] },
+                ]}
+              >
+                {/* 좌하단 그라데이션 */}
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["rgba(17,24,39,0)", "rgba(17,24,39,0.55)"]}
+                  locations={[0, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
                 <Pressable
-                  onPress={onPressControl}
-                  onLongPress={onLongPressControl}
-                  delayLongPress={280}
-                  style={styles.playHit}
-                  accessibilityLabel={
-                    isEnded ? "다시 재생" : isPlaying ? "일시정지" : hasVideo ? "영상 재생" : hasAudioOnly ? "음성 재생" : "재생"
-                  }
+                  style={styles.synopsisInner}
+                  onPress={() => snapBanner(true)}
+                  accessibilityLabel="편지 자세히 보기"
                 >
-                  {!isPlaying && <View style={styles.playTriangle} />}
+                  {synTitle ? <Text style={styles.synopsisTitle}>{synTitle}</Text> : null}
+                  {synBody ? (
+                    <Text style={styles.synopsisBody} numberOfLines={3}>
+                      {synBody}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.synopsisHint}>전체 편지 보기 ▵</Text>
                 </Pressable>
-              </View>
-
-              <View style={styles.bottomCaption}>
-                <Text style={styles.bottomCaptionText}>
-                  전하고싶은 소중한 순간을 버튼을 눌러 확인해요!
-                </Text>
-              </View>
-
-              {/* 모서리 테이프 */}
-              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTL]} />
-              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTR]} />
-              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBL]} />
-              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBR]} />
-            </View>
+              </Animated.View>
+            )}
           </View>
 
           {/* ▶︎ 스와이프 힌트 */}
@@ -789,7 +811,7 @@ export default function CardScreen() {
             </Animated.View>
           )}
 
-          {/* 앞면 편지 배너 */}
+          {/* 앞면 편지 배너 (반투명 회색) */}
           <Animated.View
             style={[styles.letterBanner, { height: BANNER_MAX_H, transform: [{ translateY: bannerTY }] }]}
             {...bannerPanResponder.panHandlers}
@@ -812,7 +834,10 @@ export default function CardScreen() {
                     key={i}
                     style={[
                       styles.letterLineBack,
-                      { opacity: show ? (anim?.opacity ?? 0) : 0, transform: [{ translateY: show ? (anim?.ty ?? 8) : 8 }] },
+                      {
+                        opacity: show ? (anim?.opacity ?? 0) : 0,
+                        transform: [{ translateY: show ? (anim?.ty ?? 8) : 8 }],
+                      },
                     ]}
                   >
                     {line === "" ? " " : line}
@@ -823,31 +848,67 @@ export default function CardScreen() {
           </Animated.View>
         </Animated.View>
 
-        {/* 뒷면 */}
+        {/* 뒷면: 폴라로이드 + 영상 */}
         <Animated.View
           style={[styles.cardBase, styles.cardBack, { transform: [{ perspective: 1200 }, { rotateY: backRotate }] }]}
         >
           <Image source={{ uri: PAPER_TEXTURE }} style={styles.cardPaper} />
-           
-          
-          <View style={[styles.backBody, { alignItems: "center" }]}>
-  {/* 위쪽 스페이서 */}
-  <View style={{ flex: 1 }} />
 
-  {/* 중앙에 올 블록 (이미지 + 캡션) */}
-  <View style={{ alignItems: "center" }}>
-    <Image source={BOUQUET_GIF} style={styles.bouquetGif} resizeMode="contain" />
-    <Text style={styles.bouquetCaption}>꽃다발 미리보기</Text>
-  </View>
+          <View style={styles.polaroidWrap}>
+            <View style={styles.polaroidInner}>
+              <Image source={{ uri: PAPER_TEXTURE }} style={styles.paperGrain} />
 
-  {/* 아래쪽 스페이서 */}
-  <View style={{ flex: 1 }} />
-</View>
+              {/* 사진/영상 영역 */}
+              <View style={styles.photoArea}>
+                {hasVideo ? (
+                  <Video
+                    source={videoSource as any}
+                    style={styles.video}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={false}
+                    isMuted
+                    usePoster
+                    posterSource={{ uri: coverUri }}
+                  />
+                ) : (
+                  <Image source={{ uri: coverUri }} style={styles.pastedPhoto} />
+                )}
+
+                {hasVideo && <View style={styles.previewBlack} pointerEvents="none" />}
+
+                {/* 중앙 컨트롤: 탭=재생/열기, 롱탭=리셋 */}
+                <Pressable
+                  onPress={onPressControl}
+                  onLongPress={onLongPressControl}
+                  delayLongPress={280}
+                  style={styles.playHit}
+                  accessibilityLabel={
+                    isEnded ? "다시 재생" : isPlaying ? "일시정지" : hasVideo ? "영상 재생" : hasAudioOnly ? "음성 재생" : "재생"
+                  }
+                >
+                  {!isPlaying && <View style={styles.playTriangle} />}
+                </Pressable>
+              </View>
+
+              {/* 캡션(날짜/수신인) */}
+              <View style={styles.bottomCaption}>
+                <Text style={styles.bottomCaptionText}>
+                  {formatKoDate()} 사랑하는 000 {nameForCaption}에게
+                </Text>
+              </View>
+
+              {/* 모서리 테이프 */}
+              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTL]} />
+              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeTR]} />
+              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBL]} />
+              <Image source={CORNER_TAPE} style={[styles.cornerTape, styles.tapeBR]} />
+            </View>
+          </View>
         </Animated.View>
       </Animated.View>
 
       {/* 오버레이 비디오 플레이어 */}
-      {overlayVisible && (
+      {overlayVisible && videoSource && (
         <Animated.View style={[styles.overlayWrap, { opacity: overlayOpacity }]} pointerEvents={overlayVisible ? "auto" : "none"}>
           <Animated.View style={styles.overlayBg}>
             <Pressable style={styles.overlayBg} onPress={onCloseOverlay} />
@@ -945,7 +1006,54 @@ const styles = StyleSheet.create({
     opacity: 1,
     zIndex: 10,
   },
-  // 앞면 콘텐츠
+
+  // 앞면 비주얼 컨테이너
+  frontVisual: {
+    flex: 1,
+    alignItems: "stretch",
+    justifyContent: "flex-end",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    marginTop: 6,
+  },
+  frontVisualImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+  },
+
+  // 시놉시스 오버레이
+  synopsisWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 24,
+  },
+  synopsisInner: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  synopsisTitle: {
+    color: "#F9FAFB",
+    fontWeight: "800",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  synopsisBody: {
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  synopsisHint: {
+    marginTop: 8,
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  // 앞/뒤 공통 요소 (뒷면에서 사용)
   polaroidWrap: { width: "100%", alignItems: "center", paddingTop: 8 },
   polaroidInner: {
     width: "100%",
@@ -1060,27 +1168,27 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // 편지 배너
+  // 편지 배너 (반투명 회색)
   letterBanner: {
     position: "absolute",
     left: 12,
     right: 12,
     bottom: 12,
-    backgroundColor: "#FFFDF8",
+    backgroundColor: "rgba(55,65,81,0.88)", // 진회색 반투명
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
+    borderColor: "rgba(255,255,255,0.14)",
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
     zIndex: 3,
   },
   bannerPaper: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.12,
+    opacity: 0.06,
     resizeMode: "repeat" as any,
   },
   bannerHandleWrap: {
@@ -1094,10 +1202,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 5,
     borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.18)",
+    backgroundColor: "rgba(255,255,255,0.35)",
     marginBottom: 6,
   },
-  bannerTitle: { fontWeight: "800", color: "#1F2937", fontSize: 14 },
+  bannerTitle: { fontWeight: "800", color: "#F9FAFB", fontSize: 14 },
   bannerCloseBtn: {
     position: "absolute",
     right: 10,
@@ -1105,46 +1213,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.06)",
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
-  bannerCloseText: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  bannerCloseText: { fontSize: 12, fontWeight: "700", color: "#FFF" },
 
-  // 뒷면 헤더
-  backFlipText: { color: "#111827", fontWeight: "700", fontSize: 12 },
-
-  // (이건 GIF용 추가 스타일)
-  backBody: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-  },
-  bouquetGif: {
-    width: "100000%",
-    left: -20,
-    marginTop: -10,       // 필요하면 숫자 조절
-    height: Math.round(PHOTO_H * 0.9),
-    borderRadius: 8,
-    backgroundColor: "transparent",
-  },
-  bouquetCaption: {
-    marginTop: 50,
-    fontSize: 13,
-    color: "#6b7280",
-    fontWeight: "700",
-  },
-   
   // 편지 텍스트
   letterScroll: { paddingTop: 8, paddingBottom: 12, paddingHorizontal: 12 },
   letterLineBack: {
     fontSize: 16,
     lineHeight: 26,
-    color: "#2D2A26",
+    color: "#F9FAFB",
     fontWeight: "700",
     marginBottom: 6,
   },
 
-  // 오버레이 영상 
+  // 오버레이 영상
   overlayWrap: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 999,

@@ -41,7 +41,8 @@ export default function ListeningMission() {
   const [ORDER_ID, setOrderId] = useState("");
 
   /** 서버 설정 */
-  const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
+  // const BACK_SWAGGER_URL = "http://4.240.103.29:8080";
+  const BACK_SWAGGER_URL = "/api";
 
   /** 마스코트 이미지 + 애니메이션 */
   const expressions = [require("./../assets/mascot/danbi.jpg")];

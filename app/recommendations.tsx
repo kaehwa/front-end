@@ -23,7 +23,8 @@ const CARD_W = Math.floor((width - H_PADDING * 2 - GAP) / 2);
 const CARD_H = Math.floor(CARD_W * 1.35);
 
 // ── Config ────────────────────────────────────────────────────────
-const BACKEND_URL = "http://4.240.103.29:8080" // TODO: 실제 주소로 교체
+// const BACKEND_URL = "http://4.240.103.29:8080" // TODO: 실제 주소로 교체
+const BACKEND_URL = "/api"
 const ID = 22
 
 const BG = "#FFF4DA";

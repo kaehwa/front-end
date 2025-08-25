@@ -9,10 +9,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ./front-end  # 실제 존재하는 Expo 프로젝트 루트
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -25,13 +21,24 @@ jobs:
       - name: Install dependencies
         run: npm install --force
 
+      - name: Install Expo CLI locally
+        run: npm install expo@latest --save-dev
+
       - name: Build Expo Web
         run: npx expo export --platform web
 
       - name: Verify build output
-        run: ls -la dist
+        run: |
+          if [ -d dist ]; then
+            echo "dist exists"
+            ls -la dist
+          else
+            echo "dist folder does not exist. Exiting."
+            exit 1
+          fi
 
       - name: Deploy to Azure VM
+        if: success()  # 이전 단계 실패 시 스킵
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.AZURE_HOST }}
@@ -47,6 +54,7 @@ jobs:
           overwrite: true
 
       - name: Reload nginx
+        if: success()
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.AZURE_HOST }}

@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Video, ResizeMode, AVPlaybackStatusSuccess, Audio } from "expo-av";
 import EnvelopeOverlay from "../app/EnvelopeOverlay";
 import * as FileSystem from "expo-file-system";
-import * as FileSystem from "expo-file-system";
 
 // ── 화면/카드 치수 ───────────────────────────────────────────────────────────
 const { width, height } = Dimensions.get("window");

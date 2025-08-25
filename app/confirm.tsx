@@ -48,6 +48,8 @@ export default function ConfirmSelectedBouquet() {
   
   const params = useLocalSearchParams<{ id?: string }>();
   const { imgUri } = useLocalSearchParams<{ imgUri: string }>();
+  const { title } = useLocalSearchParams<{ title: string }>();
+  const { palette } = useLocalSearchParams<{ palette: string }>();
   
   const { orderID } = useLocalSearchParams<{ orderID: string }>();
   const stableId = useMemo(
@@ -222,9 +224,10 @@ export default function ConfirmSelectedBouquet() {
           <Image source={{uri: `data:image/png;base64,${imgUri}`}} style={styles.media} resizeMode="cover" />
         </Animated.View>
 
+      
         <View style={styles.metaArea}>
           <View style={{ alignItems: "center" }}>
-            <Text style={styles.titleText} numberOfLines={1}>{data.title}</Text>
+            <Text style={styles.titleText} numberOfLines={1}>{title}</Text>
             {data.floristName && (
               <View style={styles.floristPill}>
                 <Ionicons name="flower" size={12} color="#fff" />
@@ -235,9 +238,9 @@ export default function ConfirmSelectedBouquet() {
 
           {data.palette?.length ? (
             <View style={styles.paletteRow}>
-              {data.palette.slice(0, 5).map((c) => (
-                <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
-              ))}
+              {/* {palette.slice(0, 4).map((c) => (
+                    <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
+                      ))} */}
             </View>
           ) : null}
         </View>

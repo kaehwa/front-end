@@ -1,4 +1,4 @@
-name: Deploy Expogo Web to Azure VM
+name: Deploy Expo Web to Azure VM
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,15 +20,14 @@ jobs:
 
       - name: Install dependencies
         run: npm install --force
-        working-directory: front-end/gaehwa-web
+        working-directory: ./front-end
 
-      - name: Build Next.js (Expogo Web)
-        run: npm run build -- --no-lint
-        working-directory: front-end/gaehwa-web
+      - name: Build Expo Web
+        run: npx expo export --platform web
+        working-directory: ./front-end
 
-      - name: Verify build output
-        run: ls -la .next
-        working-directory: front-end/gaehwa-web
+      - name: Verify dist
+        run: ls -la ./front-end/dist
 
       - name: Deploy to Azure VM
         uses: appleboy/scp-action@v0.1.7
@@ -36,13 +35,8 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
           key: ${{ secrets.AZURE_SSH_KEY }}
-          source: |
-            front-end/gaehwa-web/.next/
-            front-end/gaehwa-web/public/
-            front-end/gaehwa-web/package.json
-            front-end/gaehwa-web/package-lock.json
-            front-end/gaehwa-web/next.config.js
-          target: "/var/www/expogo"
+          source: ./front-end/dist/
+          target: /var/www/expogo
           strip_components: 0
           overwrite: true
 
